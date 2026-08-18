@@ -293,7 +293,9 @@ export class Game {
         : [];
 
       this.collision.rebuild(rings, around.lng, around.lat, TUNING.walls.loadRadiusMetres);
-      this.realBuildingCount = this.collision.wallCount();
+      // Water blocks movement but is not architecture -- a lakeside field is
+      // still an empty field, and still needs a generated arena.
+      this.realBuildingCount = this.collision.buildingCount();
 
       // Somewhere with almost nothing built on it: a beach, a park, open
       // countryside, or simply an area nobody has mapped. Generate structure.

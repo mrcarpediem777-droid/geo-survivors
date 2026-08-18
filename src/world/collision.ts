@@ -34,6 +34,8 @@ const GRID_CELL_METRES = 24;
 interface Wall {
   /** x, y, x, y, ... east and north of the origin, in metres. */
   points: Float32Array;
+  /** Water blocks movement exactly like a building, but is counted separately. */
+  isWater: boolean;
   minX: number;
   minY: number;
   maxX: number;
@@ -140,9 +142,16 @@ export class CollisionWorld {
       if (maxX - minX < 1 && maxY - minY < 1) continue;
 
       const wallIndex = this.walls.length;
-      this.walls.push({ points, minX, minY, maxX, maxY });
+      this.walls.push({ points, minX, minY, maxX, maxY, isWater: ring.kind === 'water' });
       this.fileInGrid(wallIndex, minX, minY, maxX, maxY);
     }
+  }
+
+  /** How many of the loaded walls are actual buildings rather than water? */
+  buildingCount(): number {
+    let count = 0;
+    for (const wall of this.walls) if (!wall.isWater) count++;
+    return count;
   }
 
   /** File one wall under every grid square its bounding box touches. */
@@ -180,7 +189,7 @@ export class CollisionWorld {
       if (y > maxY) maxY = y;
     }
     const index = this.walls.length;
-    this.walls.push({ points, minX, minY, maxX, maxY });
+    this.walls.push({ points, minX, minY, maxX, maxY, isWater: false });
     this.fileInGrid(index, minX, minY, maxX, maxY);
   }
 
@@ -297,6 +306,17 @@ export class CollisionWorld {
     }
 
     return movedAtAll;
+  }
+
+  /**
+   * Is there room to place something of this size here, clear of every wall?
+   *
+   * Checking only whether the middle is inside a wall is not enough: a nest is
+   * 6 m across, so a middle sitting a metre from a house puts most of the nest
+   * inside the house. That is exactly what a tester saw.
+   */
+  hasClearance(x: number, y: number, radius: number): boolean {
+    return !this.overlapsAnyWall(x, y, radius);
   }
 
   /** Does a circle here touch any wall at all? */

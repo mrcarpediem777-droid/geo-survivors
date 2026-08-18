@@ -189,25 +189,35 @@ export class Combat {
     minMetres: number,
     maxMetres: number
   ): { x: number; y: number } | null {
-    // First choice: open ground the monsters can actually walk from.
-    for (let attempt = 0; attempt < 200; attempt++) {
-      const angle = roll() * Math.PI * 2;
-      const distance = minMetres + roll() * (maxMetres - minMetres);
-      const x = Math.cos(angle) * distance;
-      const y = Math.sin(angle) * distance;
-      if (this.collision.isInsideWall(x, y)) continue;
-      if (this.flowField.ready() && !this.flowField.isReachable(x, y)) continue;
-      return { x, y };
-    }
+    // Give way gradually rather than all at once.
+    //
+    // Demanding a full nest's worth of clear ground AND a walkable route is the
+    // ideal, but in a dense neighbourhood of terraced shophouses there may be
+    // nowhere that generous -- measured on the Han river in Da Nang, where the
+    // strict test found nothing at all and left the area with no nests, which is
+    // a game with nothing in it. So we relax one requirement at a time and take
+    // the best spot still available.
+    const attempts: { clearance: number; needsRoute: boolean }[] = [
+      { clearance: TUNING.nests.radiusMetres + 2, needsRoute: true },
+      { clearance: TUNING.nests.radiusMetres, needsRoute: true },
+      { clearance: TUNING.nests.radiusMetres * 0.6, needsRoute: true },
+      { clearance: TUNING.nests.radiusMetres * 0.6, needsRoute: false },
+      { clearance: 1.5, needsRoute: false },
+    ];
 
-    // Second choice: any open ground at all. A nest whose monsters have to
-    // wander is far better than no nest, which is a game with nothing in it.
-    for (let attempt = 0; attempt < 200; attempt++) {
-      const angle = roll() * Math.PI * 2;
-      const distance = minMetres + roll() * (maxMetres - minMetres);
-      const x = Math.cos(angle) * distance;
-      const y = Math.sin(angle) * distance;
-      if (!this.collision.isInsideWall(x, y)) return { x, y };
+    for (const rule of attempts) {
+      for (let attempt = 0; attempt < 160; attempt++) {
+        const angle = roll() * Math.PI * 2;
+        const distance = minMetres + roll() * (maxMetres - minMetres);
+        const x = Math.cos(angle) * distance;
+        const y = Math.sin(angle) * distance;
+
+        if (!this.collision.hasClearance(x, y, rule.clearance)) continue;
+        if (rule.needsRoute && this.flowField.ready() && !this.flowField.isReachable(x, y)) {
+          continue;
+        }
+        return { x, y };
+      }
     }
 
     return null;
@@ -319,7 +329,7 @@ export class Combat {
     const distance = TUNING.nests.radiusMetres + 1 + this.random() * 4;
     const x = nest.x + Math.cos(angle) * distance;
     const y = nest.y + Math.sin(angle) * distance;
-    if (this.collision.isInsideWall(x, y)) return;
+    if (!this.collision.hasClearance(x, y, 1.5)) return;
 
     this.spawnMonsterAt(variant, x, y);
   }

@@ -32,6 +32,12 @@ export interface BasemapOption {
    */
   tileUrlTemplate: string;
   /**
+   * The layer holding rivers, lakes and sea. Treated as solid, the same as
+   * buildings: monsters should not stroll across a river, and a nest should
+   * never appear in the middle of one.
+   */
+  waterSourceLayer: string;
+  /**
    * Do this provider's squares actually contain building outlines?
    * Measured, not assumed. When false, the game goes straight to generated
    * obstacles instead of hunting for walls that are not there.
@@ -90,6 +96,7 @@ export const BASEMAPS: Record<string, BasemapOption> = {
     tileUrlTemplate: 'https://tiles.openfreemap.org/planet/20260802_080001_pt/{z}/{x}/{y}.pbf',
     hasBuildingGeometry: false,
     buildingSourceLayer: 'building',
+    waterSourceLayer: 'water',
     vectorSourceId: 'openmaptiles',
     tileOrigin: 'https://tiles.openfreemap.org',
     mirrorPath: '/maptiles',
@@ -118,6 +125,7 @@ export const BASEMAPS: Record<string, BasemapOption> = {
     // from OpenFreeMap, and its building layer is called `buildings`. Getting
     // this wrong means finding zero walls and blaming the wrong thing.
     buildingSourceLayer: 'buildings',
+    waterSourceLayer: 'water_polygons',
     vectorSourceId: 'versatiles-shortbread',
     tileOrigin: 'https://tiles.versatiles.org',
     mirrorPath: '/maptiles-backup',
