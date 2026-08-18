@@ -351,14 +351,20 @@ export const TUNING = {
   /* LEVELLING                                                               */
   /* ---------------------------------------------------------------------- */
   levelling: {
-    /** Experience needed for the first level. */
-    firstLevelXp: 5,
+    /**
+     * Experience needed for the first level.
+     * Raised from 5 after play-testing: levels arrived so fast that the choice
+     * stopped feeling like a choice.
+     */
+    firstLevelXp: 9,
     /**
      * Each level costs this much more than the last.
      *   1.0  = every level costs the same, so they keep coming.
      *   1.35 = levels slow down noticeably, so early choices matter more.
+     * Raised from 1.28 for the same reason. Together these roughly halve how
+     * quickly levels arrive.
      */
-    xpGrowthPerLevel: 1.28,
+    xpGrowthPerLevel: 1.36,
     /** How many upgrade cards to offer at each level-up. */
     cardsOffered: 3,
   },
