@@ -9,7 +9,7 @@ Claude: *"Read PLAYBOOK.md and tell me where we left off."*
 
 | | |
 |---|---|
-| **Milestone reached** | **M3 — real buildings are solid walls** ✅ |
+| **Milestone reached** | **M3 — real buildings are solid walls** ✅ *verified on a real phone in Da Nang: the character stops at the building next to you* |
 | **Next milestone** | M4 — the swarm: nests, monsters, auto-firing weapons, level-ups |
 | **Code lives at** | https://github.com/mrcarpediem777-droid/geo-survivors |
 | **Live URL** | **https://geo-survivors.vercel.app** |
