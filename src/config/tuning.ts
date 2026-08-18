@@ -22,23 +22,30 @@ export const TUNING = {
      *
      * COMBAT zoom: tight enough that the player character can cross the screen in
      * a few seconds, loose enough that you can still recognise your own street.
-     * Roughly 60-80 metres of real ground across the screen.
+     *
+     * MEASURED on a 375 px-wide phone at latitude 16: this shows **76 metres**
+     * of real ground across the screen, which is inside the 60-80 m the whole
+     * design depends on. Check it yourself in the dev panel readout.
      */
-    combatZoom: 18.5,
+    combatZoom: 19.5,
     /**
      * NAVIGATION zoom: pulled back so you can see where the nests are and plan a
-     * walk. Roughly 400-600 metres across.
+     * walk. MEASURED: about 610 metres across on the same phone.
      */
-    navigationZoom: 15.5,
-    /** Zoom used on first load, before we know if there is a fight. */
-    startZoom: 17,
+    navigationZoom: 16.5,
+    /** Zoom on first load, before we know if there is a fight. About 305 m across. */
+    startZoom: 17.5,
     /** How long the smooth zoom between navigation and combat takes, in milliseconds. */
     zoomTransitionMs: 1400,
     /** Map tilt in degrees. 0 = straight down. Keep low; tilt hurts readability. */
     pitch: 0,
-    /** Hard limits so the player can never pinch-zoom somewhere unplayable. */
+    /**
+     * Hard limits so the player can never pinch-zoom somewhere unplayable.
+     * maxZoom is deliberately a little above combatZoom, leaving room to tune
+     * the fight tighter without hitting the ceiling.
+     */
     minZoom: 14,
-    maxZoom: 20,
+    maxZoom: 20.5,
   },
 
   /* ---------------------------------------------------------------------- */

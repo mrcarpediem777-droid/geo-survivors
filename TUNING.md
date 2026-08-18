@@ -14,26 +14,42 @@ you change the number back. Edit it, save, and the game reloads instantly.
 
 ## Camera — how close the map is
 
-| Number | Now | What it does |
-|---|---|---|
-| `combatZoom` | 18.5 | How far in the camera pulls when fighting. |
-| `navigationZoom` | 15.5 | How far out it pulls when travelling. |
-| `startZoom` | 17 | Where it sits when you open the app. |
-| `zoomTransitionMs` | 1400 | How long the glide between the two takes. |
-| `pitch` | 0 | Map tilt. 0 is straight down. |
-| `minZoom` / `maxZoom` | 14 / 20 | Hard limits on pinch-zooming. |
+| Number | Now | Shows about | What it does |
+|---|---|---|---|
+| `combatZoom` | 19.5 | **76 m across** | How far in the camera pulls when fighting. |
+| `navigationZoom` | 16.5 | 610 m across | How far out it pulls when travelling. |
+| `startZoom` | 17.5 | 305 m across | Where it sits when you open the app. |
+| `zoomTransitionMs` | 1400 | — | How long the glide between the two takes. |
+| `pitch` | 0 | — | Map tilt. 0 is straight down. |
+| `minZoom` / `maxZoom` | 14 / 20.5 | — | Hard limits on pinch-zooming. |
 
-**Map zoom is a strange scale.** Each +1 *halves* how much ground you see. So 18.5 is
-twice as close as 17.5, not 6% closer. Nudge it by 0.5 at a time.
+**Map zoom is a strange scale.** Each +1 *halves* how much ground you see. So 19.5 is
+twice as close as 18.5, not 5% closer. Nudge it by 0.5 at a time, and expect that to be
+a big change.
 
-- **Combat feels cramped, you cannot see monsters coming** → *lower* `combatZoom` to 18.0
-- **Your character crawls, the fight feels sluggish** → *raise* `combatZoom` to 19.0
+Measured on a 375 px-wide phone (the narrow side of a typical phone held upright):
+
+| zoom | ground across the screen |
+|---|---|
+| 16.5 | 610 m |
+| 17.5 | 305 m |
+| 18.5 | 152 m |
+| 19.0 | 108 m |
+| **19.5** | **76 m** ← combat |
+| 20.0 | 54 m |
+
+- **Combat feels cramped, you cannot see monsters coming** → *lower* `combatZoom` to 19.0
+- **Your character crawls, the fight feels sluggish** → *raise* `combatZoom` to 20.0
 - **The zoom transition feels jarring** → *raise* `zoomTransitionMs` toward 2000
 - **The zoom feels sluggish and you are waiting for it** → *lower* toward 900
 
 > **The check that matters:** open the dev panel and read the "screen ___ m across" line.
 > At combat zoom it should say roughly **60–80 m**. That is the number the whole design
 > depends on — close enough for an action game, wide enough to recognise your own street.
+>
+> ⚠️ **This is measured across the screen's narrow side.** A wider phone shows a bit more.
+> If you ever test on a tablet, expect combat to feel much wider and wrong — that is the
+> screen, not the tuning.
 
 ---
 

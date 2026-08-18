@@ -124,6 +124,9 @@ export function installDevTools(
   function setPanelOpen(open: boolean): void {
     panelOpen = open;
     panel.style.display = open ? 'block' : 'none';
+    // Fill the numbers in straight away, otherwise the panel sits blank for up
+    // to half a second every time you open it, which looks broken.
+    if (open) renderReadout();
   }
 
   panel.querySelector('#dev-close')!.addEventListener('click', () => setPanelOpen(false));
