@@ -8,6 +8,11 @@
  * earned by clearing nests, spent on small permanent improvements that make the
  * next run start a little stronger.
  *
+ * COSTS RISE WITH THE SQUARE OF WHAT YOU OWN, so the first level of something is
+ * cheap and the last is a project. That is deliberate: a permanent upgrade track
+ * that can be finished in an afternoon stops being progress and becomes a chore
+ * with a receipt.
+ *
  * WHY THE BONUSES ARE SMALL. If permanent upgrades were powerful, a new player
  * would simply be worse at the game than an old one, and the interesting part --
  * which cards you pick this run -- would stop mattering. These are meant to widen
@@ -34,48 +39,48 @@ export const META_UPGRADES: MetaUpgrade[] = [
     title: 'Vigour',
     description: '+12 starting health per level.',
     glyph: '✚',
-    maxLevel: 8,
-    costAt: (level) => 40 + level * 30,
+    maxLevel: 10,
+    costAt: (level) => 55 + level * level * 14,
   },
   {
     id: 'edge',
     title: 'Edge',
     description: '+6% damage from everything, per level.',
     glyph: '✦',
-    maxLevel: 8,
-    costAt: (level) => 50 + level * 35,
+    maxLevel: 10,
+    costAt: (level) => 70 + level * level * 18,
   },
   {
     id: 'reach',
     title: 'Reach',
     description: '+2 metres of rope per level. More room to move without walking.',
     glyph: '⌒',
-    maxLevel: 5,
-    costAt: (level) => 60 + level * 45,
+    maxLevel: 6,
+    costAt: (level) => 90 + level * level * 30,
   },
   {
     id: 'greed',
     title: 'Greed',
     description: '+20% pickup range per level. Fewer levels missed.',
     glyph: '⊙',
-    maxLevel: 5,
-    costAt: (level) => 45 + level * 30,
+    maxLevel: 6,
+    costAt: (level) => 65 + level * level * 20,
   },
   {
     id: 'haste',
     title: 'Haste',
     description: '+5% movement per level.',
     glyph: '»',
-    maxLevel: 5,
-    costAt: (level) => 55 + level * 40,
+    maxLevel: 6,
+    costAt: (level) => 85 + level * level * 26,
   },
   {
     id: 'resolve',
     title: 'Resolve',
     description: 'Clear nests 8% faster per level. Less time standing still outdoors.',
     glyph: '◈',
-    maxLevel: 4,
-    costAt: (level) => 70 + level * 50,
+    maxLevel: 5,
+    costAt: (level) => 110 + level * level * 40,
   },
 ];
 
