@@ -9,8 +9,8 @@ Claude: *"Read PLAYBOOK.md and tell me where we left off."*
 
 | | |
 |---|---|
-| **Milestone reached** | **M1 — Hello map** ✅ |
-| **Next milestone** | M2 — things live on the map (canvas layer, joystick, combat zoom) |
+| **Milestone reached** | **M1 — Hello map** ✅ *verified on a real phone in Da Nang: map draws, blue dot lands accurately* |
+| **Next milestone** | M2 — things live on the map (drawing layer, leashed character, joystick, combat zoom) |
 | **Code lives at** | https://github.com/mrcarpediem777-droid/geo-survivors |
 | **Live URL** | **https://geo-survivors.vercel.app** |
 | **Vercel dashboard** | https://vercel.com/abc-70f4/geo-survivors |
