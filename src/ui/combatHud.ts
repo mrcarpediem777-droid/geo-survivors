@@ -19,6 +19,10 @@ export class CombatHud {
   private cardScreen: HTMLDivElement;
   private deathScreen: HTMLDivElement;
 
+  /** Little arrows at the screen edge pointing at off-screen nests. */
+  private nestMarkers: HTMLDivElement[] = [];
+  private markerLayer: HTMLDivElement;
+
   constructor(container: HTMLElement) {
     this.root = document.createElement('div');
     Object.assign(this.root.style, {
@@ -85,6 +89,15 @@ export class CombatHud {
       whiteSpace: 'nowrap',
     } satisfies Partial<CSSStyleDeclaration>);
     this.root.appendChild(this.readout);
+
+    /* --- edge arrows pointing at nests --- */
+    this.markerLayer = document.createElement('div');
+    Object.assign(this.markerLayer.style, {
+      position: 'absolute',
+      inset: '0',
+      pointerEvents: 'none',
+    } satisfies Partial<CSSStyleDeclaration>);
+    this.root.appendChild(this.markerLayer);
 
     /* --- level-up and death screens, hidden until needed --- */
     this.cardScreen = document.createElement('div');
@@ -215,6 +228,54 @@ export class CombatHud {
 
     this.deathScreen.append(heading, detail, button);
     this.deathScreen.style.display = 'flex';
+  }
+
+  /**
+   * Point at the nests, wherever they are.
+   *
+   * Without this the game genuinely looks broken for the first minute: nests sit
+   * 70-170 m away, the combat view shows 76 m, and a player has no way of
+   * knowing there is anything out there at all. An arrow and a distance turn an
+   * empty street into a decision about which way to face.
+   */
+  updateNestMarkers(
+    markers: { screenX: number; screenY: number; distanceMetres: number; onScreen: boolean }[]
+  ): void {
+    // Grow the pool of arrows if a new area has more nests.
+    while (this.nestMarkers.length < markers.length) {
+      const marker = document.createElement('div');
+      Object.assign(marker.style, {
+        position: 'absolute',
+        transform: 'translate(-50%, -50%)',
+        font: '700 10px/1 ui-monospace, monospace',
+        color: '#c084fc',
+        textShadow: '0 1px 4px rgba(0,0,0,0.95)',
+        textAlign: 'center',
+        whiteSpace: 'nowrap',
+        pointerEvents: 'none',
+      } satisfies Partial<CSSStyleDeclaration>);
+      this.markerLayer.appendChild(marker);
+      this.nestMarkers.push(marker);
+    }
+
+    for (let i = 0; i < this.nestMarkers.length; i++) {
+      const marker = this.nestMarkers[i];
+      const data = markers[i];
+      if (!data) {
+        marker.style.display = 'none';
+        continue;
+      }
+      marker.style.display = 'block';
+      marker.style.left = `${data.screenX}px`;
+      marker.style.top = `${data.screenY}px`;
+      marker.style.opacity = data.onScreen ? '0.75' : '1';
+      marker.textContent = data.onScreen
+        ? `NEST
+${data.distanceMetres.toFixed(0)} m`
+        : `◆
+${data.distanceMetres.toFixed(0)} m`;
+      marker.style.whiteSpace = 'pre';
+    }
   }
 
   isBlocking(): boolean {

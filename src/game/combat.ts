@@ -144,6 +144,34 @@ export class Combat {
         seed: worldSeed + i * 7919,
       });
     }
+
+    this.seedOpeningWave();
+  }
+
+  /**
+   * Put a handful of monsters already partway to the player, so a run has
+   * something in it from the first few seconds rather than the first minute.
+   */
+  private seedOpeningWave(): void {
+    const roll = this.random;
+    for (let i = 0; i < TUNING.nests.openingWaveCount; i++) {
+      // Spread them around, favouring the directions the nests are in so it
+      // still reads as "they came from there".
+      const fromNest = this.nests.length
+        ? this.nests[i % this.nests.length]
+        : { x: 1, y: 0 };
+      const nestAngle = Math.atan2(fromNest.y, fromNest.x);
+      const angle = nestAngle + (roll() - 0.5) * 1.5;
+      const distance =
+        TUNING.nests.openingWaveMinMetres +
+        roll() * (TUNING.nests.openingWaveMaxMetres - TUNING.nests.openingWaveMinMetres);
+
+      const x = Math.cos(angle) * distance;
+      const y = Math.sin(angle) * distance;
+      if (this.collision.isInsideWall(x, y)) continue;
+
+      this.spawnMonsterAt(0, x, y);
+    }
   }
 
   private clearNests(): void {
@@ -274,14 +302,19 @@ export class Combat {
       }
     }
 
-    const type = types[variant];
-
     // Appear just outside the nest, never inside a wall.
     const angle = this.random() * Math.PI * 2;
     const distance = TUNING.nests.radiusMetres + 1 + this.random() * 4;
     const x = nest.x + Math.cos(angle) * distance;
     const y = nest.y + Math.sin(angle) * distance;
     if (this.collision.isInsideWall(x, y)) return;
+
+    this.spawnMonsterAt(variant, x, y);
+  }
+
+  /** Create one monster of a given kind at an exact spot. */
+  private spawnMonsterAt(variant: number, x: number, y: number): void {
+    const type = TUNING.monsters.types[variant];
 
     const id = this.entities.spawn(
       EntityKind.MONSTER,
@@ -895,5 +928,26 @@ export class Combat {
 
   aliveMonsters(): number {
     return this.livingMonsters;
+  }
+
+  /**
+   * How far away the nearest monster is, in metres.
+   *
+   * The camera needs this rather than a simple "are there any monsters",
+   * because monsters exist from the moment a nest wakes up -- a hundred metres
+   * away and completely invisible. Zooming in for those left the player staring
+   * at an empty street while the game happened off screen.
+   */
+  nearestMonsterDistance(playerX: number, playerY: number): number {
+    const store = this.entities;
+    let best = Infinity;
+    for (let id = 0; id < store.usedSlots; id++) {
+      if (!store.alive[id] || store.kind[id] !== EntityKind.MONSTER) continue;
+      const dx = this.collision.toLocalX(store.lng[id]) - playerX;
+      const dy = this.collision.toLocalY(store.lat[id]) - playerY;
+      const d = dx * dx + dy * dy;
+      if (d < best) best = d;
+    }
+    return best === Infinity ? Infinity : Math.sqrt(best);
   }
 }

@@ -406,9 +406,16 @@ export class Game {
     }
 
     // 4. Move the camera to follow, zooming in or out as combat starts or ends.
-    // Monsters nearby count as combat too, not just touching the stick.
-    const underThreat = this.combat.aliveMonsters() > 0;
+    // Only monsters close enough to actually see count as a fight.
+    const underThreat =
+      this.combat.nearestMonsterDistance(
+        this.collision.toLocalX(this.character.lng),
+        this.collision.toLocalY(this.character.lat)
+      ) < TUNING.camera.combatWhenMonsterWithinMetres;
     this.camera.update(deltaSeconds, this.character.at(), engaged || underThreat, nowMs);
+
+    // 4b. Point at the nests, clamping any that are off screen to the edge.
+    this.updateNestMarkers();
 
     // 5. Refresh the small bars and numbers.
     const c = this.combat;
@@ -428,6 +435,41 @@ export class Game {
 
     requestAnimationFrame(this.tick);
   };
+
+  /**
+   * Work out where each nest is on screen, and pin an arrow to the edge for any
+   * that are out of view. Without these the first minute of a run looks like
+   * nothing is happening at all.
+   */
+  private updateNestMarkers(): void {
+    const canvas = this.map.getCanvas();
+    const width = canvas.clientWidth;
+    const height = canvas.clientHeight;
+    const margin = 26;
+
+    const markers = this.combat.nests.map((nest) => {
+      const lng = this.collision.toLng(nest.x);
+      const lat = this.collision.toLat(nest.y);
+      const point = this.map.project([lng, lat]);
+
+      const distance = Math.hypot(
+        nest.x - this.collision.toLocalX(this.character.lng),
+        nest.y - this.collision.toLocalY(this.character.lat)
+      );
+
+      const onScreen =
+        point.x > margin && point.x < width - margin && point.y > margin && point.y < height - margin;
+
+      return {
+        screenX: Math.max(margin, Math.min(width - margin, point.x)),
+        screenY: Math.max(margin, Math.min(height - margin, point.y)),
+        distanceMetres: distance,
+        onScreen,
+      };
+    });
+
+    this.hud.updateNestMarkers(markers);
+  }
 
   private measureFps(deltaSeconds: number): void {
     this.framesThisSecond++;

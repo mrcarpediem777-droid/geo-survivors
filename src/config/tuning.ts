@@ -61,6 +61,16 @@ export const TUNING = {
     /** How long the smooth zoom between navigation and combat takes, in milliseconds. */
     zoomTransitionMs: 1400,
     /**
+     * A monster must be at least this close before the camera counts it as a
+     * fight and zooms in.
+     *
+     * Monsters exist from the moment a nest wakes, well over a hundred metres
+     * away. Treating those as "combat" pulled the camera down to a 76 m view of
+     * an empty street while everything interesting happened off screen -- the
+     * game looked completely dead for the first minute.
+     */
+    combatWhenMonsterWithinMetres: 55,
+    /**
      * How long after you stop steering before the camera pulls back out to the
      * navigation view.
      *   TOO SHORT and the camera yo-yos every time you pause for breath.
@@ -289,6 +299,20 @@ export const TUNING = {
      *   LONGER  = you can safely ignore a nest for a while.
      */
     escalationOverSeconds: 240,
+    /**
+     * How many monsters are already on their way when a run begins, and how far
+     * out they start.
+     *
+     * Without this the first minute is empty: monsters are slower than walking,
+     * so from a nest 120 m away the first one takes a minute and a half to
+     * arrive. The brief is explicit that opening the app should never be boring,
+     * so the opening wave starts partway along the journey instead of at the
+     * nest. They still come from the nests -- they simply set off earlier.
+     */
+    openingWaveCount: 7,
+    openingWaveMinMetres: 34,
+    openingWaveMaxMetres: 62,
+
     /** A nest will not have more than this many of its monsters alive at once. */
     maxAlivePerNest: 220,
     /** How big a nest looks, in metres. */
