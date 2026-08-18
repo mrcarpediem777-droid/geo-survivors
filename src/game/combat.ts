@@ -61,6 +61,9 @@ export class Combat {
   /** True while a level-up card choice is waiting. The world stands still. */
   awaitingCardChoice = false;
 
+  /** Card choices earned but not yet shown, so none is ever lost. */
+  private pendingLevelUps = 0;
+
   /* --- the world --- */
   nests: Nest[] = [];
   private loadout: Loadout;
@@ -190,6 +193,7 @@ export class Combat {
     this.monstersKilled = 0;
     this.livingMonsters = 0;
     this.awaitingCardChoice = false;
+    this.pendingLevelUps = 0;
   }
 
   /* ------------------------------------------------------------------ */
@@ -853,15 +857,31 @@ export class Combat {
 
   private gainXp(amount: number): void {
     this.xp += amount;
+
     while (this.xp >= this.xpForNextLevel) {
       this.xp -= this.xpForNextLevel;
       this.level++;
       this.xpForNextLevel = Math.round(
         TUNING.levelling.firstLevelXp * Math.pow(TUNING.levelling.xpGrowthPerLevel, this.level - 1)
       );
-      this.awaitingCardChoice = true;
-      this.events.onLevelUp(this.level);
+      // Owed, not offered. Gaining two levels from one pickup must hand out two
+      // cards -- my first version raised the flag twice and showed one screen,
+      // silently swallowing the reward.
+      this.pendingLevelUps++;
     }
+
+    this.offerNextLevelUpIfIdle();
+  }
+
+  /**
+   * Show the next owed card choice, if one is owed and none is already open.
+   * Called after gaining experience and again after each choice is made.
+   */
+  offerNextLevelUpIfIdle(): void {
+    if (this.awaitingCardChoice || this.pendingLevelUps <= 0) return;
+    this.pendingLevelUps--;
+    this.awaitingCardChoice = true;
+    this.events.onLevelUp(this.level);
   }
 
   /** How fierce things are right now, 0 to 1. For the HUD and for tuning. */

@@ -156,6 +156,8 @@ export class Game {
       this.cardsTaken.set(card.id, (this.cardsTaken.get(card.id) ?? 0) + 1);
       this.combat.setLoadout(this.loadout);
       this.combat.awaitingCardChoice = false;
+      // If that pickup was worth two levels, show the next card straight away.
+      this.combat.offerNextLevelUpIfIdle();
     });
   }
 
