@@ -279,9 +279,13 @@ export class Game {
    * neighbourhood turns out to be nearly empty, invent some obstacles so the
    * fight still has shape.
    */
+  /** Whatever went wrong last time we tried to build the walls. */
+  wallError: string | null = null;
+
   async rebuildWalls(around: LatLng): Promise<void> {
     if (this.wallsLoading) return;
     this.wallsLoading = true;
+    this.wallError = null;
 
     try {
       const rings = activeBasemap.hasBuildingGeometry
@@ -313,6 +317,12 @@ export class Game {
       this.combat.placeNests(cell.seed);
 
       this.wallsBuiltAt = { ...around };
+    } catch (error) {
+      // Previously this threw into a floating promise: the walls silently never
+      // appeared, and with them went the nests, the monsters and the markers,
+      // with nothing on screen to say why.
+      this.wallError = error instanceof Error ? error.message : String(error);
+      console.error('[walls] could not build them', error);
     } finally {
       this.wallsLoading = false;
     }
@@ -421,12 +431,21 @@ export class Game {
     const c = this.combat;
     const minutes = Math.floor(c.runTimeSeconds / 60);
     const seconds = Math.floor(c.runTimeSeconds % 60);
+    // The status line doubles as a diagnostic. When something upstream fails --
+    // no walls means no nests means no monsters -- this is the difference
+    // between "nothing is happening" and knowing exactly which step broke.
+    const walls = this.wallError
+      ? `walls FAILED`
+      : this.wallsLoading
+        ? 'walls loading'
+        : `w${this.collision.wallCount()}`;
+
     this.hud.update(
       c.health,
       c.maxHealth,
       c.xp,
       c.xpForNextLevel,
-      `${minutes}:${String(seconds).padStart(2, '0')}  LV${c.level}  ${c.aliveMonsters()}▲  ${c.monstersKilled}✝`
+      `${minutes}:${String(seconds).padStart(2, '0')} LV${c.level} ${walls} n${c.nests.length} m${c.aliveMonsters()} k${c.monstersKilled}`
     );
 
     // Ask the map to draw. Our layer draws as part of that same pass, which is

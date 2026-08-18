@@ -114,8 +114,13 @@ async function boot(): Promise<void> {
   // 6. START THE GAME LOOP -------------------------------------------------
   // Wait for the map's style before adding our drawing layer to it -- there is
   // nothing to add a layer TO until the style exists.
+  // Hand the camera over IMMEDIATELY, not after the map finishes loading. A GPS
+  // fix can easily arrive first, and then this file starts a gentle glide toward
+  // the anchor at the same moment the game camera starts driving every frame --
+  // two things steering one camera, which shows up as a hard jerk.
+  mapView.handCameraToGame();
+
   void mapView.whenReady().then(() => {
-    mapView.handCameraToGame();
     game.start();
   });
 

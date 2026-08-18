@@ -189,6 +189,7 @@ export class Combat {
     minMetres: number,
     maxMetres: number
   ): { x: number; y: number } | null {
+    // First choice: open ground the monsters can actually walk from.
     for (let attempt = 0; attempt < 200; attempt++) {
       const angle = roll() * Math.PI * 2;
       const distance = minMetres + roll() * (maxMetres - minMetres);
@@ -198,6 +199,17 @@ export class Combat {
       if (this.flowField.ready() && !this.flowField.isReachable(x, y)) continue;
       return { x, y };
     }
+
+    // Second choice: any open ground at all. A nest whose monsters have to
+    // wander is far better than no nest, which is a game with nothing in it.
+    for (let attempt = 0; attempt < 200; attempt++) {
+      const angle = roll() * Math.PI * 2;
+      const distance = minMetres + roll() * (maxMetres - minMetres);
+      const x = Math.cos(angle) * distance;
+      const y = Math.sin(angle) * distance;
+      if (!this.collision.isInsideWall(x, y)) return { x, y };
+    }
+
     return null;
   }
 
