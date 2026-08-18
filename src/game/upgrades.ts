@@ -1,0 +1,337 @@
+/**
+ * UPGRADE CARDS.
+ * ==============
+ * Every decision the player makes in a run happens here. The joystick is the
+ * only control during combat and all weapons fire themselves, so the ONLY thing
+ * separating one run from another is which cards were picked.
+ *
+ * That means this file is where the replayability lives. The brief asks for
+ * 12-15 cards producing visibly different playstyles, so the pool is built
+ * around a simple rule:
+ *
+ *   WEAPONS change what the fight looks like.
+ *   PASSIVES change how much of it you get.
+ *
+ * A player who takes the orbit and the pulse ends up hugging the swarm and
+ * killing everything that touches them. A player who takes the lance and range
+ * ends up standing at the end of an alley deleting whole queues of monsters. A
+ * player who takes scatter and multishot ends up shredding anything close but
+ * helpless against a spitter across the square. Those are three different games,
+ * and none of them required a different button.
+ */
+
+/** A weapon fires on its own timer. Each behaves visibly differently. */
+export const WeaponId = {
+  BOLT: 'bolt',
+  SCATTER: 'scatter',
+  ORBIT: 'orbit',
+  PULSE: 'pulse',
+  LANCE: 'lance',
+} as const;
+
+export type WeaponIdValue = (typeof WeaponId)[keyof typeof WeaponId];
+
+export interface WeaponState {
+  id: WeaponIdValue;
+  level: number;
+  /** Seconds until this fires again. */
+  cooldown: number;
+  /** Rotation for the orbiting blades, in radians. */
+  spin: number;
+}
+
+/**
+ * Everything the player has accumulated this run.
+ * Passives are multipliers and additions applied on top of the base numbers in
+ * the tuning file, so tuning and progression stay separate.
+ */
+export interface Loadout {
+  weapons: WeaponState[];
+
+  /* Passive effects, all starting neutral. */
+  damageMultiplier: number;
+  fireRateMultiplier: number;
+  rangeMultiplier: number;
+  /** Extra shots added to every volley. */
+  extraProjectiles: number;
+  /** How many monsters a shot passes through before stopping. */
+  pierce: number;
+  moveSpeedMultiplier: number;
+  leashBonusMetres: number;
+  pickupRadiusMultiplier: number;
+  maxHealthBonus: number;
+  /** Fraction of incoming damage ignored, 0 to 0.6. */
+  armour: number;
+}
+
+export function freshLoadout(): Loadout {
+  return {
+    weapons: [{ id: WeaponId.BOLT, level: 1, cooldown: 0, spin: 0 }],
+    damageMultiplier: 1,
+    fireRateMultiplier: 1,
+    rangeMultiplier: 1,
+    extraProjectiles: 0,
+    pierce: 0,
+    moveSpeedMultiplier: 1,
+    leashBonusMetres: 0,
+    pickupRadiusMultiplier: 1,
+    maxHealthBonus: 0,
+    armour: 0,
+  };
+}
+
+export interface UpgradeCard {
+  id: string;
+  /** Shown on the card. */
+  title: string;
+  /** One line the player reads while deciding. */
+  description: string;
+  /** A single character used as placeholder art. */
+  glyph: string;
+  /** New weapons feel different from stat bumps, so we mark them. */
+  isWeapon: boolean;
+  /** How many times this can be taken. */
+  maxTimes: number;
+  /** Can it be offered right now? */
+  available: (loadout: Loadout) => boolean;
+  apply: (loadout: Loadout) => void;
+}
+
+/** Find a weapon in the loadout, or undefined. */
+function weapon(loadout: Loadout, id: WeaponIdValue): WeaponState | undefined {
+  return loadout.weapons.find((w) => w.id === id);
+}
+
+/** Add a weapon, or level it up if already held. */
+function addOrLevel(loadout: Loadout, id: WeaponIdValue): void {
+  const existing = weapon(loadout, id);
+  if (existing) existing.level++;
+  else loadout.weapons.push({ id, level: 1, cooldown: 0, spin: 0 });
+}
+
+/** How many weapons a player may carry, so runs stay distinct. */
+export const MAX_WEAPONS = 4;
+
+function canTakeWeapon(loadout: Loadout, id: WeaponIdValue): boolean {
+  return weapon(loadout, id) !== undefined || loadout.weapons.length < MAX_WEAPONS;
+}
+
+export const UPGRADE_CARDS: UpgradeCard[] = [
+  /* ---------------------------------------------------------------- */
+  /* WEAPONS -- these change what the fight looks like                  */
+  /* ---------------------------------------------------------------- */
+  {
+    id: 'scatter',
+    title: 'Scattergun',
+    description: 'A short, wide spray at whatever is closest. Brutal up close, useless far away.',
+    glyph: '≡',
+    isWeapon: true,
+    maxTimes: 5,
+    available: (l) => canTakeWeapon(l, WeaponId.SCATTER),
+    apply: (l) => addOrLevel(l, WeaponId.SCATTER),
+  },
+  {
+    id: 'orbit',
+    title: 'Orbiting Shards',
+    description: 'Blades circle you, cutting anything that comes close. No aiming, no reload.',
+    glyph: '◌',
+    isWeapon: true,
+    maxTimes: 5,
+    available: (l) => canTakeWeapon(l, WeaponId.ORBIT),
+    apply: (l) => addOrLevel(l, WeaponId.ORBIT),
+  },
+  {
+    id: 'pulse',
+    title: 'Shockwave',
+    description: 'A ring of force bursts out of you every few seconds. Clears crowds off your feet.',
+    glyph: '◎',
+    isWeapon: true,
+    maxTimes: 5,
+    available: (l) => canTakeWeapon(l, WeaponId.PULSE),
+    apply: (l) => addOrLevel(l, WeaponId.PULSE),
+  },
+  {
+    id: 'lance',
+    title: 'Piercing Lance',
+    description: 'A long bolt that runs straight through a whole queue of monsters. Made for alleys.',
+    glyph: '↑',
+    isWeapon: true,
+    maxTimes: 5,
+    available: (l) => canTakeWeapon(l, WeaponId.LANCE),
+    apply: (l) => addOrLevel(l, WeaponId.LANCE),
+  },
+
+  /* ---------------------------------------------------------------- */
+  /* PASSIVES -- these change how much fight you get                    */
+  /* ---------------------------------------------------------------- */
+  {
+    id: 'damage',
+    title: 'Sharpened',
+    description: 'Everything you fire hits 22% harder.',
+    glyph: '✦',
+    isWeapon: false,
+    maxTimes: 8,
+    available: () => true,
+    apply: (l) => {
+      l.damageMultiplier *= 1.22;
+    },
+  },
+  {
+    id: 'firerate',
+    title: 'Quickened',
+    description: 'Everything fires 18% more often.',
+    glyph: '⚡',
+    isWeapon: false,
+    maxTimes: 8,
+    available: () => true,
+    apply: (l) => {
+      l.fireRateMultiplier *= 1.18;
+    },
+  },
+  {
+    id: 'range',
+    title: 'Far Sight',
+    description: 'Your weapons reach 25% further. Good with the lance, wasted on the scattergun.',
+    glyph: '◇',
+    isWeapon: false,
+    maxTimes: 6,
+    available: () => true,
+    apply: (l) => {
+      l.rangeMultiplier *= 1.25;
+    },
+  },
+  {
+    id: 'multishot',
+    title: 'Split Shot',
+    description: 'One extra projectile in every volley.',
+    glyph: '⋔',
+    isWeapon: false,
+    maxTimes: 4,
+    available: () => true,
+    apply: (l) => {
+      l.extraProjectiles += 1;
+    },
+  },
+  {
+    id: 'pierce',
+    title: 'Punch Through',
+    description: 'Your shots carry on through one more monster before stopping.',
+    glyph: '→',
+    isWeapon: false,
+    maxTimes: 4,
+    available: () => true,
+    apply: (l) => {
+      l.pierce += 1;
+    },
+  },
+  {
+    id: 'speed',
+    title: 'Light Feet',
+    description: 'You move 15% faster on the stick.',
+    glyph: '»',
+    isWeapon: false,
+    maxTimes: 5,
+    available: () => true,
+    apply: (l) => {
+      l.moveSpeedMultiplier *= 1.15;
+    },
+  },
+  {
+    id: 'leash',
+    title: 'Long Rope',
+    description: 'Roam 6 metres further from your real position. More room to kite.',
+    glyph: '⌒',
+    isWeapon: false,
+    maxTimes: 3,
+    available: () => true,
+    apply: (l) => {
+      l.leashBonusMetres += 6;
+    },
+  },
+  {
+    id: 'magnet',
+    title: 'Magnetism',
+    description: 'Experience is pulled in from 60% further away.',
+    glyph: '⊙',
+    isWeapon: false,
+    maxTimes: 4,
+    available: () => true,
+    apply: (l) => {
+      l.pickupRadiusMultiplier *= 1.6;
+    },
+  },
+  {
+    id: 'vitality',
+    title: 'Vitality',
+    description: '+30 health, and you heal back a little faster.',
+    glyph: '✚',
+    isWeapon: false,
+    maxTimes: 6,
+    available: () => true,
+    apply: (l) => {
+      l.maxHealthBonus += 30;
+    },
+  },
+  {
+    id: 'armour',
+    title: 'Thick Skin',
+    description: 'Ignore 10% more of every hit. Stacks, but never past 60%.',
+    glyph: '▣',
+    isWeapon: false,
+    maxTimes: 6,
+    available: (l) => l.armour < 0.6,
+    apply: (l) => {
+      l.armour = Math.min(0.6, l.armour + 0.1);
+    },
+  },
+];
+
+/**
+ * Choose which cards to offer at a level-up.
+ *
+ * Deliberately weighted so a new weapon is more likely while you have few,
+ * because a run where the first three cards are all "+22% damage" is a boring
+ * run. Once you have a full set the pool tilts back to sharpening what you hold.
+ */
+export function pickCards(
+  loadout: Loadout,
+  taken: Map<string, number>,
+  howMany: number,
+  random: () => number
+): UpgradeCard[] {
+  const eligible = UPGRADE_CARDS.filter(
+    (card) => (taken.get(card.id) ?? 0) < card.maxTimes && card.available(loadout)
+  );
+
+  const weightOf = (card: UpgradeCard): number => {
+    if (!card.isWeapon) return 1;
+    // Strongly favour weapons while the player is still assembling a kit.
+    const held = loadout.weapons.length;
+    return held >= MAX_WEAPONS ? 0.8 : 3.2 - held * 0.5;
+  };
+
+  const chosen: UpgradeCard[] = [];
+  const pool = [...eligible];
+
+  while (chosen.length < howMany && pool.length > 0) {
+    let total = 0;
+    for (const card of pool) total += weightOf(card);
+
+    let roll = random() * total;
+    let index = 0;
+    for (; index < pool.length; index++) {
+      roll -= weightOf(pool[index]);
+      if (roll <= 0) break;
+    }
+
+    chosen.push(pool[Math.min(index, pool.length - 1)]);
+    pool.splice(Math.min(index, pool.length - 1), 1);
+  }
+
+  return chosen;
+}
+
+/** Experience needed to reach a given level. */
+export function xpForLevel(level: number, firstLevelXp: number, growth: number): number {
+  return Math.round(firstLevelXp * Math.pow(growth, level - 1));
+}

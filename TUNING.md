@@ -172,6 +172,84 @@ will appear to stop short of walls, which reads as broken.
 
 ---
 
+## Monsters
+
+Every monster type lives in `TUNING.monsters.types`. Each has speed, health, damage, size,
+experience and how common it is.
+
+> ⚠️ **Every speed is under 1.4 m/s, the pace of a walking human, and that is a safety
+> rule rather than a balance one.** It guarantees you can always walk away from any fight
+> without hurrying. If combat feels too easy, raise their **numbers**, never their speed.
+
+| Type | Speed | Health | What it does |
+|---|---|---|---|
+| swarmer | 1.3 | 10 | The crowd. Weak alone, lethal in numbers. |
+| brute | 0.75 | 60 | Slow wall of meat. Clogs alleys. |
+| spitter | 1.0 | 18 | Stops at 34 m and shoots. **Its shots are blocked by real buildings.** |
+
+- **Fights feel toothless** → raise `weight` on brutes, or lower `fastestSpawnIntervalSeconds`
+- **Fights feel unfair** → raise `startingSpawnIntervalSeconds`, or lower monster `damagePerSecond`
+- **Monsters clump into one blob** → raise `separationStrength`
+- **Monsters snag on corners** → lower `unstickAfterSeconds` toward 0.4
+
+---
+
+## Nests
+
+| Number | Now | What it does |
+|---|---|---|
+| `countPerCell` | 2 | How many exist near you. |
+| `minDistanceMetres` / `maxDistanceMetres` | 70 / 170 | How far away they sit. |
+| `startingSpawnIntervalSeconds` | 2.2 | Seconds between monsters, when new. |
+| `fastestSpawnIntervalSeconds` | 0.28 | The floor. How bad it can ever get. |
+| `escalationOverSeconds` | 240 | How long a nest takes to reach full fury. |
+| `maxAlivePerNest` | 220 | Ceiling on the swarm size. |
+
+> **The distance numbers are tighter than they look.** Monsters must stay slower than a
+> walking human, so a nest 200 m away takes them over two and a half minutes to reach you.
+> Measured at the original 120–260 m, the first three minutes of a run were completely
+> empty. At 70–170 m the first monsters arrive around 60–90 seconds and never stop.
+
+---
+
+## The player in a fight
+
+| Number | Now | What it does |
+|---|---|---|
+| `maxHealth` | 100 | |
+| `healthRegenPerSecond` | 0.8 | So one mistake is not permanent. |
+| `invulnerableAfterHitSeconds` | 0.55 | Stops a crowd deleting you instantly. |
+| `pickupRadiusMetres` | 14 | How close experience must be to rush to you. |
+
+> **Experience always drifts toward you**, quickly inside that radius and slowly from
+> anywhere else. That "slowly from anywhere" part is not decoration: weapons kill out to
+> 42 m, the leash holds you within 28 m, and without it a measured three-minute run
+> produced 36 kills and **not a single level** — everything died just out of reach.
+
+---
+
+## Levelling and cards
+
+| Number | Now | What it does |
+|---|---|---|
+| `firstLevelXp` | 5 | Experience for the first level. |
+| `xpGrowthPerLevel` | 1.28 | How much dearer each level gets. |
+| `cardsOffered` | 3 | Cards shown at each level-up. |
+
+Measured run, standing perfectly still and always taking the **first** card offered (a
+deliberately poor strategy): **level 10, 87 kills, 273 monsters at peak, died at 4 minutes.**
+A player who moves and chooses well should do considerably better.
+
+- **Levels come too fast to feel earned** → raise `xpGrowthPerLevel` toward 1.4
+- **Progress stalls and runs feel flat** → lower it toward 1.15
+- **Too many choices interrupt the fight** → this is the wrong dial; raise `xpGrowthPerLevel`
+
+The card pool itself is in `src/game/upgrades.ts`, with a comment at the top explaining how
+the weapons are meant to differ. There are 13 cards: 4 weapons and 9 passives, plus the
+starting bolt.
+
+---
+
 ## Performance ⏳ *(mostly M6)*
 
 | Number | Now | What it does |

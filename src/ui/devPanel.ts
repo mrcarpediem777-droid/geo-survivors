@@ -109,6 +109,7 @@ export function installDevTools(
       <button id="dev-show-walls" style="${buttonStyle()}">show/hide walls</button>
       <button id="dev-markers" style="${buttonStyle()}">test markers here</button>
       <button id="dev-stress" style="${buttonStyle()}">stress test</button>
+      <button id="dev-restart" style="${buttonStyle()}">restart run</button>
       <button id="dev-reset-save" style="${buttonStyle()}">wipe save</button>
     </div>
 
@@ -317,6 +318,8 @@ export function installDevTools(
     }
   });
 
+  panel.querySelector('#dev-restart')!.addEventListener('click', () => game.restartRun());
+
   panel.querySelector('#dev-reset-save')!.addEventListener('click', () => {
     profile.reset();
     readoutEl.textContent = 'save wiped -- reload the page';
@@ -431,6 +434,8 @@ export function installDevTools(
       `screen     ${across.toFixed(0)} m across`,
       `camera     ${g.inCombat ? 'COMBAT' : 'navigation'}`,
       `entities   ${g.entitiesAlive} alive / ${g.entitiesDrawn} drawn`,
+      `monsters   ${g.monsters} alive, ${g.nests} nests, pressure ${(g.pressure * 100).toFixed(0)}%`,
+      `player     LV${g.level}  ${g.health.toFixed(0)} hp`,
       `walls      ${g.walls.loading ? 'loading...' : g.walls.wallCount + ' (' + g.walls.realBuildings + ' real, ' + g.walls.generated + ' generated)'}`,
       `arena      ${g.walls.usingFallbackArena ? 'FALLBACK -- too few real buildings here' : 'real buildings'}`,
       `tiles read ${g.walls.tilesFetched}`,

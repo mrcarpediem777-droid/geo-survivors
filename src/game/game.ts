@@ -29,6 +29,10 @@ import { CollisionWorld } from '../world/collision';
 import { BuildingSource } from '../world/buildingSource';
 import { addFallbackArena } from '../world/fallbackArena';
 import { FlowField } from '../world/flowField';
+import { Combat } from './combat';
+import { CombatHud } from '../ui/combatHud';
+import { freshLoadout, pickCards, type Loadout, type UpgradeCard } from './upgrades';
+import { seededRandom } from '../world/determinism';
 import { worldCellFor } from '../world/determinism';
 import { activeBasemap } from '../config/basemap';
 import { TUNING } from '../config/tuning';
@@ -62,6 +66,11 @@ export interface GameStats {
   entitiesDrawn: number;
   inCombat: boolean;
   zoom: number;
+  monsters: number;
+  nests: number;
+  pressure: number;
+  level: number;
+  health: number;
   walls: WallStats;
   leashTension: number;
   distanceFromAnchor: number;
@@ -76,6 +85,14 @@ export class Game {
 
   readonly collision = new CollisionWorld();
   readonly flowField = new FlowField();
+  readonly combat: Combat;
+  readonly hud: CombatHud;
+
+  /** Everything the player has picked up this run. */
+  loadout: Loadout = freshLoadout();
+  /** How many times each card has been taken, so limits are respected. */
+  private cardsTaken = new Map<string, number>();
+  private cardRandom = seededRandom(7);
   readonly buildings: BuildingSource;
 
   private map: MapLibreMap;
@@ -108,6 +125,64 @@ export class Game {
     this.camera = new GameCamera(map);
     this.joystick = new Joystick(uiContainer);
     this.character = new PlayerCharacter(startAt);
+    this.hud = new CombatHud(uiContainer);
+
+    this.combat = new Combat(this.entities, this.collision, this.flowField, this.loadout, {
+      onLevelUp: (level) => this.offerCards(level),
+      onDeath: () => this.handleDeath(),
+    });
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Levelling and death                                                 */
+  /* ------------------------------------------------------------------ */
+
+  private offerCards(level: number): void {
+    const cards = pickCards(
+      this.loadout,
+      this.cardsTaken,
+      TUNING.levelling.cardsOffered,
+      this.cardRandom
+    );
+
+    // Nothing left to offer -- everything is maxed. Carry on rather than stall.
+    if (cards.length === 0) {
+      this.combat.awaitingCardChoice = false;
+      return;
+    }
+
+    this.hud.showCards(level, cards, (card: UpgradeCard) => {
+      card.apply(this.loadout);
+      this.cardsTaken.set(card.id, (this.cardsTaken.get(card.id) ?? 0) + 1);
+      this.combat.setLoadout(this.loadout);
+      this.combat.awaitingCardChoice = false;
+    });
+  }
+
+  private handleDeath(): void {
+    const minutes = Math.floor(this.combat.runTimeSeconds / 60);
+    const seconds = Math.floor(this.combat.runTimeSeconds % 60);
+    this.hud.showDeath(
+      `Survived ${minutes}m ${seconds}s · level ${this.combat.level} · ${this.combat.monstersKilled} killed`,
+      () => this.restartRun()
+    );
+  }
+
+  /** Start a fresh run from where the player is standing. */
+  restartRun(): void {
+    this.loadout = freshLoadout();
+    this.cardsTaken.clear();
+    this.combat.setLoadout(this.loadout);
+    this.combat.reset();
+
+    // Re-seed the nests from wherever the walls were built. Falling back to
+    // that rather than requiring a GPS fix matters: without it, restarting
+    // before the first fix silently left a world with no nests in it at all.
+    const around = this.anchor ?? this.wallsBuiltAt;
+    if (around) {
+      const cell = worldCellFor(around.lat, around.lng);
+      this.combat.placeNests(cell.seed);
+    }
   }
 
   /* ------------------------------------------------------------------ */
@@ -229,6 +304,11 @@ export class Game {
       // Give the pathfinding its own copy of where the buildings are. Done here,
       // once, rather than every time monsters need directions.
       this.flowField.rasteriseWalls(this.collision, 0, 0);
+      this.flowField.update(0, 0, performance.now());
+
+      // Nests belong to the patch of world, so they move with it.
+      const cell = worldCellFor(around.lat, around.lng);
+      this.combat.placeNests(cell.seed);
 
       this.wallsBuiltAt = { ...around };
     } finally {
@@ -260,8 +340,19 @@ export class Game {
     const cameFromLng = this.character.lng;
     const cameFromLat = this.character.lat;
 
-    // 2. Move the character, honouring the leash.
-    this.character.update(deltaSeconds, this.anchor, input);
+    // Everything stops while a card is being chosen, or after death.
+    const paused = this.hud.isBlocking();
+
+    // 2. Move the character, honouring the leash and any upgrades taken.
+    if (!paused) {
+      this.character.update(
+        deltaSeconds,
+        this.anchor,
+        input,
+        this.loadout.moveSpeedMultiplier,
+        this.loadout.leashBonusMetres
+      );
+    }
 
     // 2b. Push the character out of any building it has walked into.
     // Done after movement rather than by refusing the move, because sliding
@@ -304,8 +395,30 @@ export class Game {
       );
     }
 
+    // 3c. The fight itself: nests, monsters, weapons, damage, experience.
+    if (!paused && this.collision.wallCount() > 0) {
+      const px = this.collision.toLocalX(this.character.lng);
+      const py = this.collision.toLocalY(this.character.lat);
+      this.combat.update(deltaSeconds, px, py);
+      this.combat.checkEnemyShots(px, py);
+    }
+
     // 4. Move the camera to follow, zooming in or out as combat starts or ends.
-    this.camera.update(deltaSeconds, this.character.at(), engaged, nowMs);
+    // Monsters nearby count as combat too, not just touching the stick.
+    const underThreat = this.combat.aliveMonsters() > 0;
+    this.camera.update(deltaSeconds, this.character.at(), engaged || underThreat, nowMs);
+
+    // 5. Refresh the small bars and numbers.
+    const c = this.combat;
+    const minutes = Math.floor(c.runTimeSeconds / 60);
+    const seconds = Math.floor(c.runTimeSeconds % 60);
+    this.hud.update(
+      c.health,
+      c.maxHealth,
+      c.xp,
+      c.xpForNextLevel,
+      `${minutes}:${String(seconds).padStart(2, '0')}  LV${c.level}  ${c.aliveMonsters()}▲  ${c.monstersKilled}✝`
+    );
 
     // Ask the map to draw. Our layer draws as part of that same pass, which is
     // precisely why it cannot fall out of step with the streets underneath.
@@ -335,6 +448,11 @@ export class Game {
       entitiesDrawn: this.layer.drawnLastFrame(),
       inCombat: this.camera.isInCombat(),
       zoom: this.camera.currentZoom(),
+      monsters: this.combat.aliveMonsters(),
+      nests: this.combat.nests.length,
+      pressure: this.combat.pressure(),
+      level: this.combat.level,
+      health: this.combat.health,
       walls: {
         wallCount: this.collision.wallCount(),
         realBuildings: this.realBuildingCount,

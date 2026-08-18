@@ -35,6 +35,8 @@ export const EntityKind = {
   NEST: 4,
   /** Only used in M2, to prove things stay stuck to the map. */
   TEST_MARKER: 5,
+  /** Experience dropped by a dead monster. */
+  XP_ORB: 6,
 } as const;
 
 export type EntityKindValue = (typeof EntityKind)[keyof typeof EntityKind];
@@ -47,6 +49,7 @@ export const KIND_COLOURS: Record<number, [number, number, number, number]> = {
   [EntityKind.PICKUP]: [120, 220, 140, 255], // green
   [EntityKind.NEST]: [160, 80, 220, 255], // purple
   [EntityKind.TEST_MARKER]: [255, 160, 40, 255], // orange
+  [EntityKind.XP_ORB]: [90, 200, 255, 255], // pale blue
 };
 
 /** A handle to one entity. It is just its slot number in the arrays. */
@@ -67,6 +70,27 @@ export class EntityStore {
 
   /** How big the thing is, in real metres. */
   readonly radiusMetres: Float32Array;
+
+  /* --- combat --- */
+  readonly health: Float32Array;
+  readonly maxHealth: Float32Array;
+  /** Movement speed in metres per second. */
+  readonly speed: Float32Array;
+  /** Damage dealt on touching the player, per second of contact. */
+  readonly damage: Float32Array;
+  /** Which flavour of monster, indexing into the monster table. */
+  readonly variant: Uint8Array;
+  /** Experience granted when killed, or carried by a pickup. */
+  readonly value: Float32Array;
+  /** Seconds left before this disappears on its own. 0 means forever. */
+  readonly lifetime: Float32Array;
+  /** General-purpose timer: reload for shooters, wind-up for spawns. */
+  readonly cooldown: Float32Array;
+  /**
+   * How long this has been failing to make progress, in seconds. Monsters use
+   * it to notice they are jammed on a corner and shove themselves sideways.
+   */
+  readonly stuckFor: Float32Array;
 
   /** Colour, four bytes per entity (red, green, blue, alpha). */
   readonly colour: Uint8Array;
@@ -91,6 +115,15 @@ export class EntityStore {
     this.velocityEast = new Float32Array(capacity);
     this.velocityNorth = new Float32Array(capacity);
     this.radiusMetres = new Float32Array(capacity);
+    this.health = new Float32Array(capacity);
+    this.maxHealth = new Float32Array(capacity);
+    this.speed = new Float32Array(capacity);
+    this.damage = new Float32Array(capacity);
+    this.variant = new Uint8Array(capacity);
+    this.value = new Float32Array(capacity);
+    this.lifetime = new Float32Array(capacity);
+    this.cooldown = new Float32Array(capacity);
+    this.stuckFor = new Float32Array(capacity);
     this.colour = new Uint8Array(capacity * 4);
     this.kind = new Uint8Array(capacity);
     this.alive = new Uint8Array(capacity);
@@ -137,6 +170,17 @@ export class EntityStore {
     this.radiusMetres[id] = radiusMetres;
     this.kind[id] = kind;
     this.alive[id] = 1;
+
+    // Combat fields start blank; whoever spawns this fills in what it needs.
+    this.health[id] = 1;
+    this.maxHealth[id] = 1;
+    this.speed[id] = 0;
+    this.damage[id] = 0;
+    this.variant[id] = 0;
+    this.value[id] = 0;
+    this.lifetime[id] = 0;
+    this.cooldown[id] = 0;
+    this.stuckFor[id] = 0;
 
     const c = id * 4;
     this.colour[c] = colour[0];

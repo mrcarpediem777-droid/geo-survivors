@@ -9,8 +9,8 @@ Claude: *"Read PLAYBOOK.md and tell me where we left off."*
 
 | | |
 |---|---|
-| **Milestone reached** | **M3 — real buildings are solid walls** ✅ *verified on a real phone in Da Nang: the character stops at the building next to you* |
-| **Next milestone** | M4 — the swarm: nests, monsters, auto-firing weapons, level-ups |
+| **Milestone reached** | **M4 — the swarm** ✅ *(M3 verified on a real phone in Da Nang)* |
+| **Next milestone** | M5 — clearing nests, rewards and permanent progress |
 | **Code lives at** | https://github.com/mrcarpediem777-droid/geo-survivors |
 | **Live URL** | **https://geo-survivors.vercel.app** |
 | **Vercel dashboard** | https://vercel.com/abc-70f4/geo-survivors |
@@ -129,7 +129,11 @@ at the edge of its rope, then walk with the arrow keys and watch it get dragged 
 - the **solid blue circle** is the character you steer
 - the gap between them is the leash
 
-**Walls are real now.** Try to walk your character into the building next to you — it
+**There is a game now.** Purple nests sit 70–170 m away and pour monsters at you. Your
+weapons fire themselves — you never aim. Kill things, collect the blue sparks, and at each
+level pick one of three cards. Standing still gets you about four minutes.
+
+**Walls are real.** Try to walk your character into the building next to you — it
 will not go. Press **show/hide walls** in the dev panel to highlight in red exactly what
 the game treats as solid; those shapes should sit precisely on the buildings the map has
 drawn.
@@ -259,6 +263,61 @@ is rewritten, in one place, `transformRequest` in `src/map/mapView.ts`.
 > that is a handful of testers and nowhere near the limit. If the game ever gets popular
 > in a region that needs mirroring, this becomes a real bill and we should host map data
 > properly instead. Flagging it now so it is not a surprise later.
+
+---
+
+## How the fight works
+
+**You never attack.** Weapons fire on their own at whatever is in range. The only thing you
+control is where you stand, and the only decisions you make are the cards at level-up. That
+is the brief's locked rule, and everything else follows from it.
+
+**Monsters find you with one shared calculation.** Rather than have each of 400 monsters
+work out its own way around the buildings, the game floods the neighbourhood outward from
+you a few times a second and leaves behind a grid of arrows: *from this spot, that way is
+the player*. Every monster just reads the arrow under its feet. Because the flood cannot
+cross buildings, the arrows follow the streets — which is why monsters pour down roads and
+funnel through gaps instead of drifting through walls.
+
+**Three kinds of monster, and the third is the interesting one.** Swarmers are fast and
+weak, brutes are slow and tough, and spitters stop at a distance and shoot. Spitter shots
+are blocked by real buildings, so **stepping behind a real house genuinely saves you.**
+That single rule is what makes your neighbourhood tactical rather than decorative.
+
+**Pressure only goes up.** Each nest spawns faster the longer it is left alone, easing from
+one monster every two seconds to one every third of a second. Standing still forever is not
+survivable — which is the point. M5 is where you get to do something about it.
+
+### Two bugs a simulated run caught that eyes would not
+
+Both were found by running four minutes of game in a fraction of a second and reading the
+numbers, rather than by playing:
+
+1. **Three minutes of nothing at the start.** Monsters must be slower than a walking human
+   (a safety rule, not a balance one), so nests at the original 120–260 m took them over
+   two and a half minutes to arrive. Nests moved to 70–170 m.
+
+2. **Not a single level-up in a whole run.** Weapons kill out to 42 m, experience was only
+   collected within 14 m, and the leash holds you inside 28 m. Everything died just out of
+   reach and rotted. 36 kills, zero levels. Experience now always drifts toward you.
+
+After both: level 10, 87 kills, 273 monsters at peak — standing perfectly still and
+deliberately always taking the first card offered.
+
+### What it costs
+
+Measured with 190 monsters on screen, on this machine:
+
+| | |
+|---|---|
+| Whole fight simulation | 0.24 ms a frame |
+| Handing entities to the graphics card | 0.06 ms a frame |
+| Routing calculation for the entire swarm | 4.2 ms, four times a second |
+| **Budget for 60 fps** | **16.7 ms a frame** |
+| Monsters found standing inside a building | **0** |
+
+The real question — what a mid-range Android does with all of that plus the map — is
+answered by the frame counter in the dev panel, on your phone, outdoors.
 
 ---
 
