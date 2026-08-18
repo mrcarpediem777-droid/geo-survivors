@@ -339,7 +339,11 @@ export class Game {
     if (first) {
       this.character.snapTo(anchor);
       this.camera.snapTo(anchor);
-      this.spawnTestMarkers(anchor);
+      // Test markers used to appear here. They were scaffolding for M2 -- rings
+      // at 10, 25 and 50 m that proved game objects stay welded to the map --
+      // and they did their job three milestones ago. Now there are monsters and
+      // pickups to look at, orange diamonds sitting in the street are just
+      // clutter that reads as loot. Still available from the dev panel.
     }
 
     // Work out the walls when we arrive, and again only after real travel --
