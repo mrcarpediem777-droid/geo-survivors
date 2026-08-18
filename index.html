@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Geo-Survivors</title>
+
+    <!--
+      This viewport line is what makes the game fill a phone screen properly.
+      - width=device-width : use the real phone width, do not pretend to be a desktop
+      - user-scalable=no   : stop pinch-zooming the PAGE (we want pinch to zoom the MAP)
+      - viewport-fit=cover : draw underneath the notch / rounded corners
+    -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#0d1117" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
+    <style>
+      /* Reset: no scrolling, no bounce, no text selection. This is a game, not a page. */
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #0d1117;
+        color: #e6edf3;
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        /* Stop the phone treating game touches as text selection or page scrolling */
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+        overscroll-behavior: none;
+      }
+      /* The map fills everything and sits at the very back. */
+      #map { position: absolute; inset: 0; }
+      /* Everything drawn on top of the map (HUD, buttons) lives here. */
+      #ui {
+        position: absolute;
+        inset: 0;
+        pointer-events: none; /* clicks pass through to the map by default */
+        padding: env(safe-area-inset-top) env(safe-area-inset-right)
+                 env(safe-area-inset-bottom) env(safe-area-inset-left);
+      }
+      #ui > * { pointer-events: auto; } /* ...but real UI elements still catch taps */
+    </style>
+  </head>
+  <body>
+    <div id="map"></div>
+    <div id="ui"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
