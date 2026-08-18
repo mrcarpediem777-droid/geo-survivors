@@ -250,6 +250,41 @@ starting bolt.
 
 ---
 
+## Clearing nests
+
+| Number | Now | What it does |
+|---|---|---|
+| `radiusMetres` | 26 | How close your REAL position must be. |
+| `holdSeconds` | 50 | How long you stand there. |
+| `spawnMultiplierWhileCapturing` | 3.4 | How much harder the nest fights back. |
+| `decayRate` | 0.35 | How fast progress fades if you step away. |
+| `baseReward` | 30 | Essence per nest. |
+| `rewardPerMinuteAlive` | 8 | Extra essence for an older nest. |
+
+- **Clearing feels like a chore** → *lower* `holdSeconds` toward 35
+- **Clearing feels too easy** → *raise* `spawnMultiplierWhileCapturing` toward 5
+- **Losing progress to GPS drift is infuriating** → *lower* `decayRate` toward 0.15
+- **Progress needs to matter more** → *raise* `baseReward`
+
+⚠️ **`radiusMetres` is measured from your GPS anchor, never from the steered character.**
+That is the entire point: the rope is 28 m, so a nest at 140 m cannot be reached by thumb.
+Verified — a full minute of pushing the stick yields zero progress. If you ever measure
+this from the character instead, walking stops being required and half the design dies.
+
+⚠️ **Never add a time limit on reaching a nest.** Not a countdown, not a bonus for speed,
+not a nest that expires. The brief forbids it and it is the one rule that keeps this game
+safe to play outdoors.
+
+---
+
+## Permanent upgrades
+
+Six of them, in `src/game/metaProgress.ts` with their costs. Bought with essence, kept
+forever, and deliberately modest — a new player should not simply be worse at the game
+than an old one. If they ever start deciding runs, shrink them.
+
+---
+
 ## Performance ⏳ *(mostly M6)*
 
 | Number | Now | What it does |

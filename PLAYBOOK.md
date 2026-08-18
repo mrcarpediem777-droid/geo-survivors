@@ -9,8 +9,8 @@ Claude: *"Read PLAYBOOK.md and tell me where we left off."*
 
 | | |
 |---|---|
-| **Milestone reached** | **M4 — the swarm** ✅ *(M3 verified on a real phone in Da Nang)* |
-| **Next milestone** | M5 — clearing nests, rewards and permanent progress |
+| **Milestone reached** | **M5 — clearing nests and permanent progress** ✅ |
+| **Next milestone** | M6 — polish: installable app, tutorial, low power mode, analytics |
 | **Code lives at** | https://github.com/mrcarpediem777-droid/geo-survivors |
 | **Live URL** | **https://geo-survivors.vercel.app** |
 | **Vercel dashboard** | https://vercel.com/abc-70f4/geo-survivors |
@@ -263,6 +263,40 @@ is rewritten, in one place, `transformRequest` in `src/map/mapView.ts`.
 > that is a handful of testers and nowhere near the limit. If the game ever gets popular
 > in a region that needs mirroring, this becomes a real bill and we should host map data
 > properly instead. Flagging it now so it is not a surprise later.
+
+---
+
+## Clearing a nest — the part that needs your feet
+
+**This is where walking becomes the point.**
+
+Nests sit 70–170 m away. The character you steer is on a 28 m rope, so a nest is
+simply out of reach of your thumb — measured: a full minute of pushing the stick gets the
+character 30.7 m out, and a nest at 140 m registers **zero** progress. There is no way to
+do this sitting down.
+
+Walk to it, and once **your real position** is within 26 m a bar starts filling. Hold
+your ground for about 50 seconds while the nest spawns monsters **three and a half times
+faster** — it fights hardest at the end. Then it dies, pays out essence, and a
+replacement rises somewhere else.
+
+**Nothing rushes you.** There is no timer on the journey and never will be; the brief
+forbids anything that would make a person hurry across a road. Step away and progress
+fades slowly rather than resetting, so backing off from a scooter costs you a few seconds,
+not a minute.
+
+**Essence is permanent.** Tap the status line at the top of the screen to spend it on six
+upgrades that survive death — health, damage, rope length, pickup range, movement, and
+clearing speed. Deliberately small: they widen the door, they do not walk through it for
+you. The cards inside a run are still where the real decisions live.
+
+The shop opens at any time, including mid-fight, for the same reason there is no travel
+timer: being unable to spend what you earned until you get home is a small version of
+being made to hurry.
+
+Measured end to end: walking 140 m at normal pace cleared a nest at **131 seconds** — 81
+walking, 50 holding — and paid 62 essence for a nest that had been alive three and a half
+minutes.
 
 ---
 

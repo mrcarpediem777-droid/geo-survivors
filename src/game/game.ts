@@ -33,6 +33,8 @@ import { Combat } from './combat';
 import { CombatHud } from '../ui/combatHud';
 import { freshLoadout, pickCards, type Loadout, type UpgradeCard } from './upgrades';
 import { seededRandom } from '../world/determinism';
+import { bonusesFrom, costToBuy, META_UPGRADES, type MetaLevels } from './metaProgress';
+import type { Profile } from '../profile/profile';
 import { worldCellFor } from '../world/determinism';
 import { activeBasemap } from '../config/basemap';
 import { TUNING } from '../config/tuning';
@@ -118,6 +120,9 @@ export class Game {
   private fpsAccumulatorMs = 0;
   private measuredFps = 0;
 
+  /** Where permanent progress is kept. Set by main.ts right after construction. */
+  profile: Profile | null = null;
+
   constructor(map: MapLibreMap, uiContainer: HTMLElement, startAt: LatLng, useMirror = false) {
     this.map = map;
     this.buildings = new BuildingSource(useMirror);
@@ -126,10 +131,12 @@ export class Game {
     this.joystick = new Joystick(uiContainer);
     this.character = new PlayerCharacter(startAt);
     this.hud = new CombatHud(uiContainer);
+    this.hud.onStatusTapped = () => this.openShop();
 
     this.combat = new Combat(this.entities, this.collision, this.flowField, this.loadout, {
       onLevelUp: (level) => this.offerCards(level),
       onDeath: () => this.handleDeath(),
+      onNestCleared: (reward) => this.handleNestCleared(reward),
     });
   }
 
@@ -161,7 +168,67 @@ export class Game {
     });
   }
 
+  /** A nest has been cleared. Bank the reward permanently, straight away. */
+  private handleNestCleared(reward: number): void {
+    if (!this.profile) return;
+    const data = this.profile.get();
+    this.profile.update({
+      essence: data.essence + reward,
+      nestsCleared: data.nestsCleared + 1,
+    });
+    this.hud.showNestCleared(reward, data.essence + reward);
+  }
+
+  /**
+   * Open the permanent-upgrade shop.
+   *
+   * Available at any moment, including mid-run. The brief forbids anything that
+   * makes somebody hurry in the real world, and being unable to spend what you
+   * earned until you get home is a small version of exactly that.
+   */
+  openShop(): void {
+    if (!this.profile) return;
+    const data = this.profile.get();
+    this.hud.showShop(
+      data.essence,
+      data.metaLevels,
+      (id) => this.buyUpgrade(id),
+      () => {}
+    );
+  }
+
+  private buyUpgrade(id: string): void {
+    if (!this.profile) return;
+    const data = this.profile.get();
+    const upgrade = META_UPGRADES.find((u) => u.id === id);
+    if (!upgrade) return;
+
+    const cost = costToBuy(upgrade, data.metaLevels);
+    if (cost === null || data.essence < cost) return;
+
+    const levels = { ...data.metaLevels, [id]: (data.metaLevels[id] ?? 0) + 1 };
+    this.profile.update({ essence: data.essence - cost, metaLevels: levels });
+
+    // Redraw with the new totals, and apply anything that takes effect at once.
+    this.openShop();
+    this.combat.setCaptureSpeed(this.metaBonuses().captureSpeedMultiplier);
+  }
+
+  /** Everything permanent the player has bought, as plain multipliers. */
+  private metaBonuses() {
+    return bonusesFrom((this.profile?.get().metaLevels ?? {}) as MetaLevels);
+  }
+
   private handleDeath(): void {
+    // Records survive death even though the run does not.
+    if (this.profile) {
+      const data = this.profile.get();
+      this.profile.update({
+        bestSurvivalSeconds: Math.max(data.bestSurvivalSeconds, Math.round(this.combat.runTimeSeconds)),
+        bestLevel: Math.max(data.bestLevel, this.combat.level),
+      });
+    }
+
     const minutes = Math.floor(this.combat.runTimeSeconds / 60);
     const seconds = Math.floor(this.combat.runTimeSeconds % 60);
     this.hud.showDeath(
@@ -174,7 +241,16 @@ export class Game {
   restartRun(): void {
     this.loadout = freshLoadout();
     this.cardsTaken.clear();
+    // Fold permanent progress into the fresh loadout.
+    const meta = this.metaBonuses();
+    this.loadout.maxHealthBonus += meta.bonusHealth;
+    this.loadout.damageMultiplier *= meta.damageMultiplier;
+    this.loadout.leashBonusMetres += meta.bonusLeashMetres;
+    this.loadout.pickupRadiusMultiplier *= meta.pickupMultiplier;
+    this.loadout.moveSpeedMultiplier *= meta.moveMultiplier;
+
     this.combat.setLoadout(this.loadout);
+    this.combat.setCaptureSpeed(meta.captureSpeedMultiplier);
     this.combat.reset();
 
     // Re-seed the nests from wherever the walls were built. Falling back to
@@ -357,6 +433,16 @@ export class Game {
     // Everything stops while a card is being chosen, or after death.
     const paused = this.hud.isBlocking();
 
+    // SAFETY CATCH. The world holds still while a card choice is open, so if
+    // that flag is ever set without a screen actually on display, the game
+    // freezes solid with no way out -- monsters stop, capture stops, nothing
+    // explains why. Caught this happening during testing. If the two ever
+    // disagree, believe the screen.
+    if (this.combat.awaitingCardChoice && !paused) {
+      this.combat.awaitingCardChoice = false;
+      this.combat.offerNextLevelUpIfIdle();
+    }
+
     // 1b. IF YOUR REAL POSITION IS INSIDE A BUILDING, LEASH TO THE DOORSTEP.
     //
     // Testing indoors puts the anchor inside a house. The leash then pulls the
@@ -432,6 +518,16 @@ export class Game {
     if (!paused && this.collision.wallCount() > 0) {
       const px = this.collision.toLocalX(this.character.lng);
       const py = this.collision.toLocalY(this.character.lat);
+
+      // Capture is measured from where you REALLY are, not from the character
+      // you steer -- that is what makes clearing a nest cost footsteps.
+      if (this.anchor) {
+        this.combat.setAnchor(
+          this.collision.toLocalX(this.anchor.lng),
+          this.collision.toLocalY(this.anchor.lat)
+        );
+      }
+
       this.combat.update(deltaSeconds, px, py);
       this.combat.checkEnemyShots(px, py);
     }
@@ -448,6 +544,14 @@ export class Game {
     // 4b. Point at the nests, clamping any that are off screen to the edge.
     this.updateNestMarkers();
 
+    // 4c. The nest you are standing on, if any.
+    const capturing = this.combat.capturingNest();
+    this.hud.updateCapture(
+      capturing?.captureProgress ?? 0,
+      capturing?.beingCaptured ?? false,
+      TUNING.capture.radiusMetres
+    );
+
     // 5. Refresh the small bars and numbers.
     const c = this.combat;
     const minutes = Math.floor(c.runTimeSeconds / 60);
@@ -455,6 +559,9 @@ export class Game {
     // The status line doubles as a diagnostic. When something upstream fails --
     // no walls means no nests means no monsters -- this is the difference
     // between "nothing is happening" and knowing exactly which step broke.
+    const nestDistance = this.combat.nearestNestDistance();
+    const essence = this.profile?.get().essence ?? 0;
+
     const walls = this.wallError
       ? `walls FAILED`
       : this.wallsLoading
@@ -466,7 +573,9 @@ export class Game {
       c.maxHealth,
       c.xp,
       c.xpForNextLevel,
-      `${minutes}:${String(seconds).padStart(2, '0')} LV${c.level} ${walls} n${c.nests.length} m${c.aliveMonsters()} k${c.monstersKilled}`
+      `${minutes}:${String(seconds).padStart(2, '0')} LV${c.level} ${walls} ` +
+        `nest ${Number.isFinite(nestDistance) ? Math.round(nestDistance) + 'm' : '--'} ` +
+        `m${c.aliveMonsters()} ${essence}✦`
     );
 
     // Ask the map to draw. Our layer draws as part of that same pass, which is
