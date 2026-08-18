@@ -12,7 +12,8 @@ Claude: *"Read PLAYBOOK.md and tell me where we left off."*
 | **Milestone reached** | **M1 — Hello map** ✅ |
 | **Next milestone** | M2 — things live on the map (canvas layer, joystick, combat zoom) |
 | **Code lives at** | https://github.com/mrcarpediem777-droid/geo-survivors |
-| **Live URL** | *connecting Vercel — see "Putting it on the internet" below* |
+| **Live URL** | **https://geo-survivors.vercel.app** |
+| **Vercel dashboard** | https://vercel.com/abc-70f4/geo-survivors |
 
 ---
 
@@ -70,8 +71,12 @@ the version we put on the internet. Verified: the deployed bundle contains none 
 
 ## How to put it on the internet (deploy)
 
-Once set up, deploying is automatic: **every time Claude saves work to GitHub, Vercel
-rebuilds your live URL within about a minute.** You do not have to do anything.
+**Already set up. Deploying is now automatic** — every time Claude saves work to GitHub,
+Vercel rebuilds https://geo-survivors.vercel.app within about a minute. You do not have to
+do anything, ever.
+
+Verified on the live site: the dev panel is **absent** from the public build, and the
+corrected camera numbers are live.
 
 If you ever need to deploy by hand, run:
 
@@ -173,7 +178,6 @@ mode** toggle that reduces monster counts and map redraws. Until then:
 
 | | |
 |---|---|
-| **Not deployed yet** | Code is on GitHub; the Vercel connection is the last step. |
 | **Anti-cheat is weak on the web** | Android has a proper built-in "this location is fake" flag, but web pages are not allowed to read it — only real installed apps can. Our checks are indirect guesswork for now. This gets much stronger if we port to native. |
 | **`building-3d` layer unused** | The map style has 3D buildings we currently ignore. Might be useful for line-of-sight in M3, might just cost frames. To be decided. |
 | **Bundle is 960 kB** | Almost all of it is the map library itself (250 kB once compressed, which is fine on mobile data). Not worth optimising yet. |
