@@ -28,6 +28,7 @@ import { offsetByMetres, distanceMetres } from '../location/geo';
 import { CollisionWorld } from '../world/collision';
 import { BuildingSource } from '../world/buildingSource';
 import { addFallbackArena } from '../world/fallbackArena';
+import { FlowField } from '../world/flowField';
 import { worldCellFor } from '../world/determinism';
 import { activeBasemap } from '../config/basemap';
 import { TUNING } from '../config/tuning';
@@ -74,6 +75,7 @@ export class Game {
   readonly character: PlayerCharacter;
 
   readonly collision = new CollisionWorld();
+  readonly flowField = new FlowField();
   readonly buildings: BuildingSource;
 
   private map: MapLibreMap;
@@ -224,6 +226,10 @@ export class Game {
         );
       }
 
+      // Give the pathfinding its own copy of where the buildings are. Done here,
+      // once, rather than every time monsters need directions.
+      this.flowField.rasteriseWalls(this.collision, 0, 0);
+
       this.wallsBuiltAt = { ...around };
     } finally {
       this.wallsLoading = false;
@@ -283,6 +289,19 @@ export class Game {
     // 3. Copy the character into the data the graphics card will read.
     if (this.playerEntity >= 0) {
       this.entities.setPosition(this.playerEntity, this.character.lng, this.character.lat);
+    }
+
+    // 3b. Refresh the swarm's shared routes, a few times a second rather than
+    // every frame. One calculation serves every monster.
+    if (
+      this.collision.wallCount() > 0 &&
+      this.flowField.msSinceBuild(nowMs) > TUNING.navigation.recalculateEveryMs
+    ) {
+      this.flowField.update(
+        this.collision.toLocalX(this.character.lng),
+        this.collision.toLocalY(this.character.lat),
+        nowMs
+      );
     }
 
     // 4. Move the camera to follow, zooming in or out as combat starts or ends.

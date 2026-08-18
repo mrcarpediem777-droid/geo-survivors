@@ -155,6 +155,21 @@ export const TUNING = {
   },
 
   /* ---------------------------------------------------------------------- */
+  /* MONSTER NAVIGATION                                                      */
+  /* ---------------------------------------------------------------------- */
+  navigation: {
+    /**
+     * How often the whole swarm's routes are recalculated, in milliseconds.
+     * This is ONE calculation shared by every monster, so it is cheap -- but it
+     * is not free, and it does not need to be instant.
+     *   LOWER  = monsters react to your movement faster, more work per second.
+     *   HIGHER = monsters briefly keep heading where you WERE. At 250 ms you
+     *            would have to sprint to notice.
+     */
+    recalculateEveryMs: 250,
+  },
+
+  /* ---------------------------------------------------------------------- */
   /* PERFORMANCE                                                             */
   /* ---------------------------------------------------------------------- */
   performance: {
