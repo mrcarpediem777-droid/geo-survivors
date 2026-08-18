@@ -1,0 +1,12 @@
+{
+  "rewrites": [
+    {
+      "source": "/maptiles/:path*",
+      "destination": "https://tiles.openfreemap.org/:path*"
+    },
+    {
+      "source": "/maptiles-backup/:path*",
+      "destination": "https://tiles.versatiles.org/:path*"
+    }
+  ]
+}
