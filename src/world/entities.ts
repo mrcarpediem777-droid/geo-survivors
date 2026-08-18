@@ -48,7 +48,7 @@ export const KIND_COLOURS: Record<number, [number, number, number, number]> = {
   [EntityKind.PROJECTILE]: [250, 220, 120, 255], // pale yellow
   [EntityKind.PICKUP]: [120, 220, 140, 255], // green
   [EntityKind.NEST]: [160, 80, 220, 255], // purple
-  [EntityKind.TEST_MARKER]: [255, 160, 40, 255], // orange
+  [EntityKind.TEST_MARKER]: [180, 180, 190, 200], // grey -- a debug aid, never loot
   [EntityKind.XP_ORB]: [255, 214, 64, 255], // gold -- unmistakably loot
 };
 

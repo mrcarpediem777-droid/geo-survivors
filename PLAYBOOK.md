@@ -138,10 +138,18 @@ will not go. Press **show/hide walls** in the dev panel to highlight in red exac
 the game treats as solid; those shapes should sit precisely on the buildings the map has
 drawn.
 
-**The orange dots** are test markers at fixed real-world positions, in rings 10 m, 25 m
-and 50 m out. They exist so you can check the most important thing in M2: zoom and pan
-however you like, and they must stay glued to the same patches of pavement. If they ever
-slide, something is badly wrong.
+**What you see on the street, and nothing else:**
+
+| | |
+|---|---|
+| **White circle** | you |
+| **Red, pink and orange circles** | monsters |
+| **Gold diamonds** | experience — walk near and it flies to you |
+| **Purple rings** | nests |
+
+Test markers used to sit here too — grey rings at 10, 25 and 50 m that proved game
+objects stay welded to the map. They were scaffolding for M2 and are no longer shown in
+play, because clutter in the street reads as loot. The dev panel can still summon them.
 
 Steer for a moment and the camera glides in to combat view (about 76 m across). Stand
 still for four seconds and it glides back out to about 610 m. Never a cut.
