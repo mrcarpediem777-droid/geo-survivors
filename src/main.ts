@@ -17,6 +17,7 @@ import { PlayerLocation } from './location/playerLocation';
 import { MapView } from './map/mapView';
 import { Hud } from './ui/hud';
 import { showMapTrouble } from './ui/mapTrouble';
+import { Game } from './game/game';
 import type { LatLng } from './location/geo';
 
 /**
@@ -65,10 +66,18 @@ async function boot(): Promise<void> {
   // that fails too. A real player on a bad connection gets this as well.
   mapView.onTrouble((diagnostics) => showMapTrouble(uiContainer, diagnostics));
 
-  // 4. THE INTERFACE -------------------------------------------------------
+  // 4. THE GAME ------------------------------------------------------------
+  // Everything that moves: the entity pool, the drawing layer welded into the
+  // map, the leashed character, the joystick and the combat camera.
+  const game = new Game(mapView.map, uiContainer, startAt);
+
+  // 5. THE INTERFACE -------------------------------------------------------
   const hud = new Hud(uiContainer, () => {
     const anchor = location.current().anchor;
-    if (anchor) mapView.recentre(anchor);
+    if (anchor) {
+      mapView.recentre(anchor);
+      game.camera.resume(); // start following again after a manual drag
+    }
   });
 
   // Whenever the position changes, update everything that cares about it.
@@ -77,6 +86,7 @@ async function boot(): Promise<void> {
 
     if (state.anchor) {
       mapView.setAnchorPosition(state.anchor);
+      game.setAnchor(state.anchor);
 
       // The circle shows how unsure we are. On real GPS that is what the phone
       // reports; on fake GPS it is our own smoothing uncertainty.
@@ -97,10 +107,19 @@ async function boot(): Promise<void> {
 
   // Keep the "centre on me" button in sync with whether the map is following.
   setInterval(() => {
-    hud.setRecentreVisible(!mapView.isFollowing() && location.current().anchor !== null);
+    const lost = game.camera.isSuspended() || !mapView.isFollowing();
+    hud.setRecentreVisible(lost && location.current().anchor !== null);
   }, 400);
 
-  // 5. START THE GPS -------------------------------------------------------
+  // 6. START THE GAME LOOP -------------------------------------------------
+  // Wait for the map's style before adding our drawing layer to it -- there is
+  // nothing to add a layer TO until the style exists.
+  void mapView.whenReady().then(() => {
+    mapView.handCameraToGame();
+    game.start();
+  });
+
+  // 7. START THE GPS -------------------------------------------------------
   // Start asking for the location IMMEDIATELY -- do not wait for the map to
   // finish drawing first. Two reasons:
   //   - Getting a GPS fix takes several seconds, and the map takes several
@@ -112,10 +131,10 @@ async function boot(): Promise<void> {
   //     the map is ready.
   location.startRealGps();
 
-  // 6. DEV TOOLS -- see the long comment above -----------------------------
+  // 8. DEV TOOLS -- see the long comment above -----------------------------
   if (DEV_TOOLS_ENABLED) {
     const { installDevTools } = await import('./ui/devPanel');
-    installDevTools(uiContainer, mapView, location, profile);
+    installDevTools(uiContainer, mapView, location, profile, game);
 
     // Also hang the game's pieces off the browser's debug console, so problems
     // can be poked at directly. Same rule as the panel: stripped from the real build.
@@ -126,6 +145,7 @@ async function boot(): Promise<void> {
       // Lets us open the "map did not load" screen on demand to check it reads
       // well, without having to break the internet first.
       showMapTrouble: () => showMapTrouble(uiContainer, mapView.getDiagnostics()),
+      game,
     };
   }
 }

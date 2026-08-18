@@ -19,6 +19,7 @@ import { Marker } from 'maplibre-gl';
 import type { MapView } from '../map/mapView';
 import type { PlayerLocation } from '../location/playerLocation';
 import type { Profile } from '../profile/profile';
+import type { Game } from '../game/game';
 import type { LatLng } from '../location/geo';
 import { offsetByMetres, metresAcrossScreen } from '../location/geo';
 import { worldCellFor, minutesUntilNextSlot } from '../world/determinism';
@@ -35,7 +36,8 @@ export function installDevTools(
   uiContainer: HTMLElement,
   mapView: MapView,
   location: PlayerLocation,
-  profile: Profile
+  profile: Profile,
+  game: Game
 ): void {
   /* ------------------------------------------------------------------ */
   /* State                                                               */
@@ -94,13 +96,17 @@ export function installDevTools(
 
     <div id="dev-fake-help" style="display:none;margin-bottom:10px;color:#7d8fa1">
       Drag the orange marker to teleport.<br />
-      Arrow keys or WASD to walk. Hold Shift to move faster.
+      <b>Arrow keys = your feet</b> (moves your real position).<br />
+      <b>WASD = your thumb</b> (steers the character on its leash).<br />
+      Hold Shift to walk faster.
     </div>
 
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
       <button id="dev-here" style="${buttonStyle()}">fake GPS here</button>
       <button id="dev-combat-zoom" style="${buttonStyle()}">combat zoom</button>
       <button id="dev-nav-zoom" style="${buttonStyle()}">nav zoom</button>
+      <button id="dev-markers" style="${buttonStyle()}">test markers here</button>
+      <button id="dev-stress" style="${buttonStyle()}">stress test</button>
       <button id="dev-reset-save" style="${buttonStyle()}">wipe save</button>
     </div>
 
@@ -258,6 +264,27 @@ export function installDevTools(
     });
   });
 
+  panel.querySelector('#dev-markers')!.addEventListener('click', () => {
+    const centre = mapView.map.getCenter();
+    game.spawnTestMarkers({ lat: centre.lat, lng: centre.lng });
+  });
+
+  // Spawn a swarm of dots to find out what this phone can actually draw.
+  // This is the honest answer to "will it hit 60fps with 400 monsters?".
+  panel.querySelector('#dev-stress')!.addEventListener('click', () => {
+    const centre = mapView.map.getCenter();
+    for (let i = 0; i < 400; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const distance = Math.random() * 70;
+      const at = offsetByMetres(
+        { lat: centre.lat, lng: centre.lng },
+        Math.cos(angle) * distance,
+        Math.sin(angle) * distance
+      );
+      game.entities.spawn(1 /* MONSTER */, at.lng, at.lat, 2);
+    }
+  });
+
   panel.querySelector('#dev-reset-save')!.addEventListener('click', () => {
     profile.reset();
     readoutEl.textContent = 'save wiped -- reload the page';
@@ -267,9 +294,10 @@ export function installDevTools(
   /* Keyboard walking                                                    */
   /* ------------------------------------------------------------------ */
 
-  const MOVEMENT_KEYS = new Set([
-    'arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'w', 'a', 's', 'd',
-  ]);
+  // ONLY the arrow keys move the pretend GPS. WASD belongs to the joystick,
+  // which steers the character. Keeping them apart is what lets you test the
+  // leash at a desk: arrows are your feet, WASD is your thumb.
+  const MOVEMENT_KEYS = new Set(['arrowup', 'arrowdown', 'arrowleft', 'arrowright']);
 
   window.addEventListener('keydown', (event) => {
     const key = event.key.toLowerCase();
@@ -324,10 +352,10 @@ export function installDevTools(
 
       let east = 0;
       let north = 0;
-      if (keysHeld.has('arrowup') || keysHeld.has('w')) north += 1;
-      if (keysHeld.has('arrowdown') || keysHeld.has('s')) north -= 1;
-      if (keysHeld.has('arrowleft') || keysHeld.has('a')) east -= 1;
-      if (keysHeld.has('arrowright') || keysHeld.has('d')) east += 1;
+      if (keysHeld.has('arrowup')) north += 1;
+      if (keysHeld.has('arrowdown')) north -= 1;
+      if (keysHeld.has('arrowleft')) east -= 1;
+      if (keysHeld.has('arrowright')) east += 1;
 
       if (east !== 0 || north !== 0) {
         // Normalise so moving diagonally is not faster than moving straight.
@@ -363,10 +391,15 @@ export function installDevTools(
     const centre = mapView.map.getCenter();
     const across = metresAcrossScreen(zoom, centre.lat, window.innerWidth);
 
+    const g = game.stats();
+
     const lines: string[] = [
-      `fps        ${measuredFps}`,
+      `fps        ${g.fps || measuredFps}`,
       `zoom       ${zoom.toFixed(2)}`,
       `screen     ${across.toFixed(0)} m across`,
+      `camera     ${g.inCombat ? 'COMBAT' : 'navigation'}`,
+      `entities   ${g.entitiesAlive} alive / ${g.entitiesDrawn} drawn`,
+      `leash      ${g.distanceFromAnchor.toFixed(1)} m (${(g.leashTension * 100).toFixed(0)}% stretched)`,
       `source     ${state.source}`,
       `accuracy   ${Number.isFinite(state.accuracyMetres) ? state.accuracyMetres.toFixed(1) + ' m' : '--'}`,
       `smoothing  +/-${location.smoothingUncertaintyMetres().toFixed(1)} m`,

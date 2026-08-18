@@ -130,6 +130,12 @@ export class MapView {
   private startedAtMs = Date.now();
   private triedBackup = false;
   private useMirror = false;
+  /**
+   * Once the game starts, the game camera drives the map every frame and this
+   * file must stop nudging it too -- two things steering one camera produces a
+   * fight that shows up as stutter.
+   */
+  private cameraDrivenByGame = false;
   private onMirrorEnabledCallback: (() => void) | null = null;
 
   /**
@@ -366,7 +372,7 @@ export class MapView {
   setAnchorPosition(position: LatLng): void {
     if (!this.playerMarker) {
       this.playerMarker = new Marker({
-        element: buildDot('#3b82f6', 18, '0 0 0 3px rgba(59,130,246,0.35)'),
+        element: buildAnchorRing(),
       })
         .setLngLat([position.lng, position.lat])
         .addTo(this.map);
@@ -374,7 +380,9 @@ export class MapView {
       this.playerMarker.setLngLat([position.lng, position.lat]);
     }
 
-    if (this.followPlayer) {
+    // Before the game starts we gently follow the anchor ourselves. Once the
+    // game camera takes over it does all the following, and we keep out of it.
+    if (this.followPlayer && !this.cameraDrivenByGame) {
       // `easeTo` glides rather than jumping. A jumping map is unreadable.
       this.map.easeTo({
         center: [position.lng, position.lat],
@@ -489,6 +497,28 @@ export class MapView {
   isFollowing(): boolean {
     return this.followPlayer;
   }
+
+  /** Hand the camera over to the game loop. */
+  handCameraToGame(): void {
+    this.cameraDrivenByGame = true;
+  }
+}
+
+/**
+ * The ring showing where you REALLY are, as opposed to the solid disc showing
+ * the character you steer. Keeping these two visually distinct matters: the gap
+ * between them IS the leash, and being able to see it is how the whole idea
+ * becomes understandable rather than confusing.
+ */
+function buildAnchorRing(): HTMLDivElement {
+  const element = document.createElement('div');
+  element.style.width = '22px';
+  element.style.height = '22px';
+  element.style.borderRadius = '50%';
+  element.style.border = '2.5px solid rgba(59,130,246,0.95)';
+  element.style.background = 'rgba(59,130,246,0.14)';
+  element.style.boxShadow = '0 0 0 2px rgba(255,255,255,0.55)';
+  return element;
 }
 
 /**

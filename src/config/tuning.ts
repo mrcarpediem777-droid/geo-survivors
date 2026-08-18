@@ -37,6 +37,19 @@ export const TUNING = {
     startZoom: 17.5,
     /** How long the smooth zoom between navigation and combat takes, in milliseconds. */
     zoomTransitionMs: 1400,
+    /**
+     * How long after you stop steering before the camera pulls back out to the
+     * navigation view.
+     *   TOO SHORT and the camera yo-yos every time you pause for breath.
+     *   TOO LONG and it feels like it has stopped listening to you.
+     */
+    leaveCombatAfterMs: 4000,
+    /**
+     * How quickly the camera catches up to the character, as a fraction per
+     * frame. Lower is lazier and calmer; higher glues the character to the
+     * middle of the screen and makes the world feel like it is sliding about.
+     */
+    followSmoothing: 0.14,
     /** Map tilt in degrees. 0 = straight down. Keep low; tilt hurts readability. */
     pitch: 0,
     /**
