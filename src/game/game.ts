@@ -357,11 +357,30 @@ export class Game {
     // Everything stops while a card is being chosen, or after death.
     const paused = this.hud.isBlocking();
 
+    // 1b. IF YOUR REAL POSITION IS INSIDE A BUILDING, LEASH TO THE DOORSTEP.
+    //
+    // Testing indoors puts the anchor inside a house. The leash then pulls the
+    // character into the wall while collision shoves it back out, every single
+    // frame -- and since the camera follows the character, the whole map
+    // vibrates. Resolving the anchor out of the building first removes the tug
+    // of war at its source.
+    let leashCentre = this.anchor;
+    if (this.anchor && this.collision.wallCount() > 0) {
+      const ax = this.collision.toLocalX(this.anchor.lng);
+      const ay = this.collision.toLocalY(this.anchor.lat);
+      if (this.collision.resolveCircle(ax, ay, 1.0, this.resolved, ax, ay)) {
+        leashCentre = {
+          lng: this.collision.toLng(this.resolved.x),
+          lat: this.collision.toLat(this.resolved.y),
+        };
+      }
+    }
+
     // 2. Move the character, honouring the leash and any upgrades taken.
     if (!paused) {
       this.character.update(
         deltaSeconds,
-        this.anchor,
+        leashCentre,
         input,
         this.loadout.moveSpeedMultiplier,
         this.loadout.leashBonusMetres

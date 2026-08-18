@@ -31,7 +31,18 @@ import {
   type CustomRenderMethodInput,
   type Map as MapLibreMap,
 } from 'maplibre-gl';
-import type { EntityStore } from '../world/entities';
+import { EntityKind, type EntityStore } from '../world/entities';
+
+/** Which outline each sort of thing is drawn with. */
+const SHAPE_FOR_KIND: Record<number, number> = {
+  [EntityKind.PLAYER]: 0,
+  [EntityKind.MONSTER]: 0,
+  [EntityKind.PROJECTILE]: 0,
+  [EntityKind.XP_ORB]: 1,
+  [EntityKind.PICKUP]: 1,
+  [EntityKind.NEST]: 2,
+  [EntityKind.TEST_MARKER]: 1,
+};
 
 /**
  * Runs once per CORNER of each shape.
@@ -51,6 +62,7 @@ in vec2 a_corner;
 in vec2 a_offset;     // position RELATIVE to a nearby origin, in world-map units
 in float a_radius;    // size, in those same world-map units
 in vec4 a_colour;
+in float a_shape;     // 0 = blob, 1 = gem, 2 = ring
 
 // The map's own conversion from world-map position to screen position, with the
 // origin shift already folded into it. This single value is what keeps
@@ -59,6 +71,7 @@ uniform mat4 u_matrix;
 
 out vec2 v_corner;
 out vec4 v_colour;
+out float v_shape;
 
 void main() {
   vec2 localPosition = a_offset + a_corner * a_radius;
@@ -76,6 +89,7 @@ void main() {
 
   v_corner = a_corner;
   v_colour = a_colour;
+  v_shape = a_shape;
 }`;
 
 /**
@@ -87,15 +101,30 @@ precision mediump float;
 
 in vec2 v_corner;
 in vec4 v_colour;
+in float v_shape;
 out vec4 fragColour;
 
 void main() {
-  // Distance from the middle of the square. 0 at the centre, 1 at the edge.
-  float distanceFromCentre = length(v_corner);
+  // THREE SHAPES, so a glance is enough to tell things apart.
+  //
+  // Colour alone was not sufficient on a real phone: at combat zoom everything
+  // is small and a pale blue experience orb read as just another creature. A
+  // monster, a pickup and a nest now differ in outline, not only in hue.
+  float distanceFromCentre;
 
-  // Anything outside the circle is simply not drawn, which turns our square
-  // into a round blob.
-  if (distanceFromCentre > 1.0) discard;
+  if (v_shape > 1.5) {
+    // NEST: a thick ring, so it reads as a place rather than a creature.
+    distanceFromCentre = length(v_corner);
+    if (distanceFromCentre > 1.0 || distanceFromCentre < 0.55) discard;
+  } else if (v_shape > 0.5) {
+    // PICKUP: a diamond. Sharp corners are unmistakably "not alive".
+    distanceFromCentre = abs(v_corner.x) + abs(v_corner.y);
+    if (distanceFromCentre > 1.0) discard;
+  } else {
+    // MONSTER or PLAYER: a plain round blob.
+    distanceFromCentre = length(v_corner);
+    if (distanceFromCentre > 1.0) discard;
+  }
 
   // Soften the last sliver so the edge is not jagged.
   float edgeFade = smoothstep(1.0, 0.90, distanceFromCentre);
@@ -146,8 +175,8 @@ void main() {
  * handled exactly.
  */
 
-/** How many numbers we send per entity: offset x, offset y, radius, colour. */
-const FLOATS_PER_INSTANCE = 4;
+/** Numbers per entity: offset x, offset y, radius, colour, shape. */
+const FLOATS_PER_INSTANCE = 5;
 
 export class EntityLayer implements CustomLayerInterface {
   readonly id = 'geo-survivors-entities';
@@ -206,6 +235,7 @@ export class EntityLayer implements CustomLayerInterface {
     const offsetLocation = gl.getAttribLocation(this.program, 'a_offset');
     const radiusLocation = gl.getAttribLocation(this.program, 'a_radius');
     const colourLocation = gl.getAttribLocation(this.program, 'a_colour');
+    const shapeLocation = gl.getAttribLocation(this.program, 'a_shape');
 
     this.vao = gl.createVertexArray();
     gl.bindVertexArray(this.vao);
@@ -243,6 +273,10 @@ export class EntityLayer implements CustomLayerInterface {
     // Read those four bytes back as four 0..1 colour channels.
     gl.vertexAttribPointer(colourLocation, 4, gl.UNSIGNED_BYTE, true, stride, 12);
     gl.vertexAttribDivisor(colourLocation, 1);
+
+    gl.enableVertexAttribArray(shapeLocation);
+    gl.vertexAttribPointer(shapeLocation, 1, gl.FLOAT, false, stride, 16);
+    gl.vertexAttribDivisor(shapeLocation, 1);
 
     gl.bindVertexArray(null);
   }
@@ -382,6 +416,8 @@ export class EntityLayer implements CustomLayerInterface {
       this.instanceBytes[colourByteOffset + 1] = store.colour[c + 1];
       this.instanceBytes[colourByteOffset + 2] = store.colour[c + 2];
       this.instanceBytes[colourByteOffset + 3] = store.colour[c + 3];
+
+      data[offset + 4] = SHAPE_FOR_KIND[store.kind[id]] ?? 0;
 
       written++;
     }

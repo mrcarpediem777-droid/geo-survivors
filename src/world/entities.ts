@@ -43,13 +43,13 @@ export type EntityKindValue = (typeof EntityKind)[keyof typeof EntityKind];
 
 /** Placeholder colours. Real art comes much later -- these are just shapes. */
 export const KIND_COLOURS: Record<number, [number, number, number, number]> = {
-  [EntityKind.PLAYER]: [59, 130, 246, 255], // blue
+  [EntityKind.PLAYER]: [255, 255, 255, 255], // white, so you never lose yourself in a crowd
   [EntityKind.MONSTER]: [220, 70, 70, 255], // red
   [EntityKind.PROJECTILE]: [250, 220, 120, 255], // pale yellow
   [EntityKind.PICKUP]: [120, 220, 140, 255], // green
   [EntityKind.NEST]: [160, 80, 220, 255], // purple
   [EntityKind.TEST_MARKER]: [255, 160, 40, 255], // orange
-  [EntityKind.XP_ORB]: [90, 200, 255, 255], // pale blue
+  [EntityKind.XP_ORB]: [255, 214, 64, 255], // gold -- unmistakably loot
 };
 
 /** A handle to one entity. It is just its slot number in the arrays. */
