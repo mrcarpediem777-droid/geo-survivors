@@ -51,7 +51,10 @@ export const BASEMAPS: Record<string, BasemapOption> = {
     buildingSourceLayer: 'building',
     vectorSourceId: 'openmaptiles',
     attribution: '© OpenStreetMap contributors, © OpenFreeMap',
-    notes: 'Free forever, no key. Good building coverage wherever OSM has it.',
+    notes:
+      'Free forever, no key. Good building coverage wherever OSM has it. ' +
+      'Served through Cloudflare -- measured serving from the Hong Kong edge, ' +
+      'so it is fast from Vietnam and the rest of Southeast Asia.',
   },
 
   /**
@@ -66,7 +69,10 @@ export const BASEMAPS: Record<string, BasemapOption> = {
     buildingSourceLayer: 'building',
     vectorSourceId: 'versatiles-shortbread',
     attribution: '© OpenStreetMap contributors, © Versatiles',
-    notes: 'Independent backup provider in case OpenFreeMap has an outage.',
+    notes:
+      'Independent backup provider in case OpenFreeMap has an outage. ' +
+      'CAUTION: plain nginx with no global CDN, so from Asia this is likely ' +
+      'SLOWER than the default. It is a availability fallback, not a speed one.',
   },
 };
 

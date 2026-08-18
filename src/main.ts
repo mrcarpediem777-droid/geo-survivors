@@ -16,6 +16,7 @@ import { Profile } from './profile/profile';
 import { PlayerLocation } from './location/playerLocation';
 import { MapView } from './map/mapView';
 import { Hud } from './ui/hud';
+import { showMapTrouble } from './ui/mapTrouble';
 import type { LatLng } from './location/geo';
 
 /**
@@ -52,6 +53,12 @@ async function boot(): Promise<void> {
 
   // 3. WHERE THE PLAYER IS -------------------------------------------------
   const location = new PlayerLocation();
+
+  // 3b. WATCH THE MAP ------------------------------------------------------
+  // If the map cannot draw, say why on screen instead of leaving a white
+  // rectangle. This tries the backup map provider first, and only complains if
+  // that fails too. A real player on a bad connection gets this as well.
+  mapView.onTrouble((diagnostics) => showMapTrouble(uiContainer, diagnostics));
 
   // 4. THE INTERFACE -------------------------------------------------------
   const hud = new Hud(uiContainer, () => {
@@ -107,7 +114,14 @@ async function boot(): Promise<void> {
 
     // Also hang the game's pieces off the browser's debug console, so problems
     // can be poked at directly. Same rule as the panel: stripped from the real build.
-    (window as unknown as Record<string, unknown>).__geo = { mapView, location, profile };
+    (window as unknown as Record<string, unknown>).__geo = {
+      mapView,
+      location,
+      profile,
+      // Lets us open the "map did not load" screen on demand to check it reads
+      // well, without having to break the internet first.
+      showMapTrouble: () => showMapTrouble(uiContainer, mapView.getDiagnostics()),
+    };
   }
 }
 
