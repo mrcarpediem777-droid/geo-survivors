@@ -24,6 +24,7 @@
  */
 
 import type { JoystickInput } from '../game/playerCharacter';
+import { TUNING } from '../config/tuning';
 
 /** How far from the centre, in pixels, counts as pushing all the way. */
 const MAX_PUSH_PIXELS = 62;
@@ -96,6 +97,13 @@ export class Joystick {
     this.zone.appendChild(this.base);
     container.appendChild(this.zone);
     container.appendChild(this.knob);
+
+    // With no leash there is nothing to steer, so the control should not be
+    // there at all -- an inert stick is worse than no stick.
+    if (TUNING.leash.radiusMetres <= 0) {
+      this.zone.style.display = 'none';
+      return;
+    }
 
     this.wireUpTouch();
     this.wireUpKeyboard();

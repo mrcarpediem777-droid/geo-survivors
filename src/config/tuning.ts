@@ -126,7 +126,16 @@ export const TUNING = {
      * many metres from your real (smoothed) GPS position.
      *   SMALLER = more honest to your real location, less room to dodge.
      *   LARGER  = more comfortable combat, but the game drifts from reality.
-     * Used from M2 onward.
+     * SET THIS TO 0 TO REMOVE THE THUMBSTICK ENTIRELY. The character is then
+     * pinned to your real position and moves only when you do, and the stick
+     * disappears from the screen.
+     *
+     * Before doing that, the two things the brief warned about, in your own
+     * words: dodging becomes something you do with your feet on a pavement
+     * while looking at a phone, and the character inherits the raw wobble of
+     * GPS, which is 5-20 m. The leash exists precisely to avoid both. It is
+     * your game, so the number is here and it is one number -- but try it on a
+     * street before keeping it.
      */
     radiusMetres: 28,
     /** How fast the steered character moves, in metres per second. */
