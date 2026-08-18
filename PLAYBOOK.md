@@ -43,6 +43,23 @@ internet connection, not GPS), which is fine — use fake GPS for real testing.
 
 ---
 
+## Two versions of the game, and why
+
+| | |
+|---|---|
+| **The real game** | https://geo-survivors.vercel.app — what players get. **No dev panel exists in it at all.** |
+| **The testing version** | a separate link off the `devtools` branch, with the panel switched on. Only you have it. |
+
+This is deliberate and worth understanding: the dev panel can fake your GPS, which in a
+location game is simply a cheat. It is not hidden from players in the real game — it is
+physically absent from the file they download. The testing version is a different build
+that only exists on its own link.
+
+**Walls work in both.** They load automatically as soon as your location is known. The
+panel only lets you *highlight* them.
+
+---
+
 ## How to test without going outside (dev mode)
 
 This is the important one. It lets you test everything sitting at your desk.
