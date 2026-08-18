@@ -20,6 +20,8 @@ you change the number back. Edit it, save, and the game reloads instantly.
 | `navigationZoom` | 16.5 | 610 m across | How far out it pulls when travelling. |
 | `startZoom` | 17.5 | 305 m across | Where it sits when you open the app. |
 | `zoomTransitionMs` | 1400 | — | How long the glide between the two takes. |
+| `leaveCombatAfterMs` | 4000 | — | Idle time before the camera pulls back out. |
+| `followSmoothing` | 0.14 | — | How eagerly the camera chases the character. |
 | `pitch` | 0 | — | Map tilt. 0 is straight down. |
 | `minZoom` / `maxZoom` | 14 / 20.5 | — | Hard limits on pinch-zooming. |
 
@@ -42,6 +44,13 @@ Measured on a 375 px-wide phone (the narrow side of a typical phone held upright
 - **Your character crawls, the fight feels sluggish** → *raise* `combatZoom` to 20.0
 - **The zoom transition feels jarring** → *raise* `zoomTransitionMs` toward 2000
 - **The zoom feels sluggish and you are waiting for it** → *lower* toward 900
+- **The camera yo-yos every time you pause** → *raise* `leaveCombatAfterMs` toward 7000
+- **The camera feels like it stopped listening** → *lower* it toward 2500
+- **The world slides about under you** → *lower* `followSmoothing` toward 0.08
+- **The character drifts away from the middle** → *raise* it toward 0.22
+
+Verified: steering pulls the camera to exactly 19.5, and ten seconds of standing still
+returns it to exactly 16.5.
 
 > **The check that matters:** open the dev panel and read the "screen ___ m across" line.
 > At combat zoom it should say roughly **60–80 m**. That is the number the whole design
@@ -78,7 +87,7 @@ too high, a bad wifi-based guess can yank you across town.
 
 ---
 
-## The leash — how far the character may roam from the real you ⏳ *(M2)*
+## The leash — how far the character may roam from the real you
 
 | Number | Now | What it does |
 |---|---|---|
@@ -98,6 +107,15 @@ safer and far more pleasant than requiring you to physically dodge.
 
 ⚠️ **Do not raise `radiusMetres` above about 40.** Past that the game stops being about
 your real location and the whole premise quietly dies.
+
+> **Measured behaviour, so the number does not surprise you.** The leash is elastic, not a
+> wall. Holding the stick at full push settles the character at about **30.8 m** with
+> `radiusMetres` set to 28 — roughly 10% of stretch, because the pull-back and your push
+> balance out. That is deliberate: a hard wall feels like a bug, a gentle tug feels like a
+> rope. If you want a true hard limit of 30 m, set the number to about 27.
+>
+> Also verified: walking 84 m in the real world while fighting the leash drags the
+> character along the whole way — it never gets left behind and never teleports.
 
 ---
 

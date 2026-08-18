@@ -9,8 +9,8 @@ Claude: *"Read PLAYBOOK.md and tell me where we left off."*
 
 | | |
 |---|---|
-| **Milestone reached** | **M1 — Hello map** ✅ *verified on a real phone in Da Nang: map draws, blue dot lands accurately* |
-| **Next milestone** | M2 — things live on the map (drawing layer, leashed character, joystick, combat zoom) |
+| **Milestone reached** | **M2 — things live on the map** ✅ *(M1 verified on a real phone in Da Nang)* |
+| **Next milestone** | M3 — real buildings as solid walls. **The make-or-break one.** |
 | **Code lives at** | https://github.com/mrcarpediem777-droid/geo-survivors |
 | **Live URL** | **https://geo-survivors.vercel.app** |
 | **Vercel dashboard** | https://vercel.com/abc-70f4/geo-survivors |
@@ -106,6 +106,42 @@ of the sky. Step outside and it will settle within a few seconds.
 
 ---
 
+## How to play what exists so far
+
+There are no enemies yet. What you can do is stand in a game world made of your own street.
+
+**On your phone:** put your thumb anywhere on the **lower half** of the screen and drag.
+A ring appears where you touched and you steer from there — you never have to look for it.
+The top of the screen still drags the map around.
+
+**On your computer:** open the dev panel (**`** key), tick **Fake GPS**, then:
+
+| Keys | What they are |
+|---|---|
+| **Arrow keys** | **your feet** — this is you physically walking, and it moves your real position |
+| **WASD** | **your thumb** — this steers the character on its leash |
+
+That split is the whole design in miniature. Try holding WASD until the character stops
+at the edge of its rope, then walk with the arrow keys and watch it get dragged along.
+
+**Two dots, and the difference matters:**
+- the **hollow blue ring** is where you really are (your smoothed GPS)
+- the **solid blue circle** is the character you steer
+- the gap between them is the leash
+
+**The orange dots** are test markers at fixed real-world positions, in rings 10 m, 25 m
+and 50 m out. They exist so you can check the most important thing in M2: zoom and pan
+however you like, and they must stay glued to the same patches of pavement. If they ever
+slide, something is badly wrong.
+
+Steer for a moment and the camera glides in to combat view (about 76 m across). Stand
+still for four seconds and it glides back out to about 610 m. Never a cut.
+
+The dev panel also has **stress test**, which drops 400 dots on you to see what your
+phone can actually draw.
+
+---
+
 ## What each folder does, in plain language
 
 ```
@@ -126,10 +162,19 @@ src/
 ├── profile/         ← "WHAT THE PLAYER OWNS"
 │   └── profile.ts       your settings and progress, saved on your phone
 │
+├── game/            ← THE GAME ITSELF
+│   ├── game.ts          owns everything that moves, and runs the loop
+│   ├── playerCharacter.ts the character you steer, and its leash
+│   └── gameCamera.ts    the automatic combat zoom
+│
+├── render/
+│   └── entityLayer.ts   draws game objects INSIDE the map (see below)
+│
 ├── map/
 │   └── mapView.ts       the real map on screen, and the dots drawn on it
 │
 ├── ui/
+│   ├── joystick.ts      the thumb control -- the only input during combat
 │   ├── hud.ts           the status bar and buttons over the map
 │   └── devPanel.ts      your testing cockpit (never ships to players)
 │
@@ -209,6 +254,44 @@ is rewritten, in one place, `transformRequest` in `src/map/mapView.ts`.
 > that is a handful of testers and nowhere near the limit. If the game ever gets popular
 > in a region that needs mirroring, this becomes a real bill and we should host map data
 > properly instead. Flagging it now so it is not a surprise later.
+
+---
+
+## Why the game objects cannot drift off the map
+
+This is the piece the brief called make-or-break for M2, so it is worth knowing how it
+works.
+
+The easy way to draw a game over a map is to lay a second sheet of glass on top and keep
+the two in step by hand. It is also the way that breaks: during a zoom the two update on
+slightly different schedules and the game visibly slides against the streets.
+
+Instead, our game objects are registered as a **layer inside the map itself** — drawn in
+the map's own painting pass, using the map's own camera, sitting in the stack alongside
+its roads and buildings. They cannot drift, because there is nothing for them to drift
+against.
+
+**Three bugs lived in here, and all three drew absolutely nothing while every obvious
+check still said everything was fine.** Recorded because that pattern will come back:
+
+1. **The wrong matrix.** The map offers several ways to convert a position to a place on
+   screen. The obvious-looking one works in an internal coordinate system, not the one we
+   use. Entities ended up about 430 million pixels off screen.
+2. **Numbers too small to exist.** Graphics cards use 32-bit numbers, worth about 7
+   digits. A position on the world map is a fraction of the way across the entire Earth,
+   which eats all 7. Measured: the smallest difference such a number can express near
+   Vietnam is **2.3 metres on the ground**, while a monster is 2.5 metres across. Building
+   a square around a point simply collapsed it to nothing. Fixed the way professional map
+   and globe renderers do it — do the big subtraction on the processor in 64-bit, and send
+   the graphics card only small local offsets.
+3. **An edit that silently did not happen.** A search-and-replace matched nothing, changed
+   nothing, and reported nothing. The old code kept running. Found by asking the browser to
+   print the function it was actually executing, rather than trusting the file.
+
+**How we know it works now:** not by looking at it, but by reading the actual pixels back
+off the screen. A marker's exact colour appears at its projected position in 13 samples
+across zoom levels 16 to 20 with the map panned off-centre, and a control point 40 m away
+is correctly empty.
 
 ---
 
