@@ -9,8 +9,8 @@ Claude: *"Read PLAYBOOK.md and tell me where we left off."*
 
 | | |
 |---|---|
-| **Milestone reached** | **M4 — the swarm** ✅ *(M3 verified on a real phone in Da Nang)* |
-| **Next milestone** | M5 — clearing nests, rewards and permanent progress |
+| **Milestone reached** | **M5 — clearing nests and permanent progress** ✅ |
+| **Next milestone** | M6 — polish: installable app, tutorial, low power mode, analytics |
 | **Code lives at** | https://github.com/mrcarpediem777-droid/geo-survivors |
 | **Live URL** | **https://geo-survivors.vercel.app** |
 | **Vercel dashboard** | https://vercel.com/abc-70f4/geo-survivors |
@@ -283,6 +283,40 @@ is rewritten, in one place, `transformRequest` in `src/map/mapView.ts`.
 
 ---
 
+## Clearing a nest — the part that needs your feet
+
+**This is where walking becomes the point.**
+
+Nests sit 70–170 m away. The character you steer is on a 28 m rope, so a nest is
+simply out of reach of your thumb — measured: a full minute of pushing the stick gets the
+character 30.7 m out, and a nest at 140 m registers **zero** progress. There is no way to
+do this sitting down.
+
+Walk to it, and once **your real position** is within 26 m a bar starts filling. Hold
+your ground for about 50 seconds while the nest spawns monsters **three and a half times
+faster** — it fights hardest at the end. Then it dies, pays out essence, and a
+replacement rises somewhere else.
+
+**Nothing rushes you.** There is no timer on the journey and never will be; the brief
+forbids anything that would make a person hurry across a road. Step away and progress
+fades slowly rather than resetting, so backing off from a scooter costs you a few seconds,
+not a minute.
+
+**Essence is permanent.** Tap the status line at the top of the screen to spend it on six
+upgrades that survive death — health, damage, rope length, pickup range, movement, and
+clearing speed. Deliberately small: they widen the door, they do not walk through it for
+you. The cards inside a run are still where the real decisions live.
+
+The shop opens at any time, including mid-fight, for the same reason there is no travel
+timer: being unable to spend what you earned until you get home is a small version of
+being made to hurry.
+
+Measured end to end: walking 140 m at normal pace cleared a nest at **131 seconds** — 81
+walking, 50 holding — and paid 62 essence for a nest that had been alive three and a half
+minutes.
+
+---
+
 ## How the fight works
 
 **You never attack.** Weapons fire on their own at whatever is in range. The only thing you
@@ -304,6 +338,34 @@ That single rule is what makes your neighbourhood tactical rather than decorativ
 **Pressure only goes up.** Each nest spawns faster the longer it is left alone, easing from
 one monster every two seconds to one every third of a second. Standing still forever is not
 survivable — which is the point. M5 is where you get to do something about it.
+
+### What play-testing on a phone caught that simulation could not
+
+Five faults, none of which any measurement would have found, because every one
+of them is about what a person sees:
+
+1. **The game looked completely dead indoors.** Monster routing floods outward
+   from your square; test inside a building and the flood is sealed in a room, so
+   no nest can be placed and nothing spawns. Measured with the player in a real
+   building: **0%** of the surrounding ground was reachable. It now floods from
+   the nearest open ground outside.
+2. **The camera zoomed in on nothing.** Combat zoom triggered on "a monster
+   exists", and monsters exist the moment a nest wakes 100 m away. The screen
+   clamped to 76 m of empty street while the game happened out of view. Now a
+   monster must be within 55 m.
+3. **The map shook.** Indoors, the leash pulled the character into a wall while
+   collision shoved it back out, every frame — and the camera follows the
+   character. The leash now centres on the nearest open ground.
+4. **Nests appeared inside houses and in rivers.** Placement checked only the
+   nest's centre, and water was not modelled at all. Both fixed; water is now
+   solid, which turns a river into a natural wall.
+5. **Everything looked the same, and levels arrived too fast.** Pickups are now
+   gold diamonds, nests are rings, you are a white blob. Levels take roughly
+   twice as long.
+
+**The lesson, recorded because it cost several rounds:** measurement found real
+bugs but was blind to every one of these, because no simulation ever ran from
+inside a building or looked at a screen. Get it in front of a person early.
 
 ### Two bugs a simulated run caught that eyes would not
 
@@ -332,6 +394,7 @@ Measured with 190 monsters on screen, on this machine:
 | Routing calculation for the entire swarm | 4.2 ms, four times a second |
 | **Budget for 60 fps** | **16.7 ms a frame** |
 | Monsters found standing inside a building | **0** |
+| Entities drawn at once, one draw call | **455**, including 440 monsters |
 
 The real question — what a mid-range Android does with all of that plus the map — is
 answered by the frame counter in the dev panel, on your phone, outdoors.

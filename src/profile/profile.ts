@@ -40,10 +40,20 @@ export interface ProfileData {
    * means the player never sits through that 12-second discovery twice.
    */
   useTileMirror: boolean;
+
+  /* --- permanent progress, the only things that survive dying --- */
+  /** Currency earned by clearing nests. Only ever earned on foot. */
+  essence: number;
+  /** How many of each permanent upgrade have been bought. */
+  metaLevels: Record<string, number>;
+  /** Lifetime totals, for the analytics export in M6 and for bragging. */
+  nestsCleared: number;
+  bestSurvivalSeconds: number;
+  bestLevel: number;
 }
 
 const STORAGE_KEY = 'geo-survivors.profile';
-const CURRENT_VERSION = 2;
+const CURRENT_VERSION = 3;
 
 function freshProfile(): ProfileData {
   return {
@@ -54,6 +64,11 @@ function freshProfile(): ProfileData {
     sessionCount: 0,
     lastKnownPosition: null,
     useTileMirror: false,
+    essence: 0,
+    metaLevels: {},
+    nestsCleared: 0,
+    bestSurvivalSeconds: 0,
+    bestLevel: 1,
   };
 }
 
@@ -90,6 +105,13 @@ export class Profile {
           // faster and costs us no bandwidth. If a network genuinely does block
           // them, it will simply be switched on again within a few seconds.
           useTileMirror: false,
+          // Version 3 adds permanent progress. Anyone upgrading keeps whatever
+          // they had and simply starts with none of it.
+          essence: parsed.essence ?? 0,
+          metaLevels: parsed.metaLevels ?? {},
+          nestsCleared: parsed.nestsCleared ?? 0,
+          bestSurvivalSeconds: parsed.bestSurvivalSeconds ?? 0,
+          bestLevel: parsed.bestLevel ?? 1,
         };
       }
 

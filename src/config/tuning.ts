@@ -320,6 +320,45 @@ export const TUNING = {
   },
 
   /* ---------------------------------------------------------------------- */
+  /* CLEARING A NEST -- the part that needs real walking                     */
+  /* ---------------------------------------------------------------------- */
+  capture: {
+    /**
+     * How close YOUR REAL POSITION must be to a nest to start clearing it.
+     *
+     * This is deliberately measured from your GPS anchor and not from the
+     * character you steer. The leash is only 28 m, so a nest 100 m away simply
+     * cannot be reached by thumb -- you have to walk there. That is the whole
+     * design: monsters come to you so opening the app is never boring, but
+     * PROGRESS costs footsteps.
+     */
+    radiusMetres: 26,
+    /**
+     * Seconds of holding position to destroy a nest.
+     *   SHORTER = nests are a quick errand.
+     *   LONGER  = clearing one is an event you plan for.
+     * Note there is NO time limit on getting there. Nothing in this game may
+     * ever reward hurrying in the real world.
+     */
+    holdSeconds: 50,
+    /**
+     * How much faster the nest spawns while you are clearing it. This is the
+     * "under heavy attack" part -- it fights hardest at the end.
+     */
+    spawnMultiplierWhileCapturing: 3.4,
+    /**
+     * How fast progress drains if you step away, as a fraction of fill speed.
+     * Deliberately gentle: stepping back from traffic, or GPS drifting, must
+     * never wipe out a minute of work.
+     */
+    decayRate: 0.35,
+    /** Essence for clearing a nest, before the age bonus. */
+    baseReward: 30,
+    /** Extra essence for every minute the nest had been alive. */
+    rewardPerMinuteAlive: 8,
+  },
+
+  /* ---------------------------------------------------------------------- */
   /* THE PLAYER IN COMBAT                                                    */
   /* ---------------------------------------------------------------------- */
   player: {

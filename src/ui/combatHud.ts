@@ -10,6 +10,7 @@
  */
 
 import type { UpgradeCard } from '../game/upgrades';
+import { META_UPGRADES, costToBuy, metaLevel, type MetaLevels } from '../game/metaProgress';
 
 export class CombatHud {
   private root: HTMLDivElement;
@@ -22,6 +23,16 @@ export class CombatHud {
   /** Little arrows at the screen edge pointing at off-screen nests. */
   private nestMarkers: HTMLDivElement[] = [];
   private markerLayer: HTMLDivElement;
+
+  /** The bar that fills while you stand on a nest. */
+  private captureBox: HTMLDivElement;
+  private captureFill: HTMLDivElement;
+  private captureLabel: HTMLDivElement;
+  private toast: HTMLDivElement;
+  private shopScreen: HTMLDivElement;
+
+  /** Called when the player taps the status line, to open the shop. */
+  onStatusTapped: (() => void) | null = null;
 
   constructor(container: HTMLElement) {
     this.root = document.createElement('div');
@@ -88,6 +99,11 @@ export class CombatHud {
       letterSpacing: '0.06em',
       whiteSpace: 'nowrap',
     } satisfies Partial<CSSStyleDeclaration>);
+    // The status line is also the way into the shop. A separate button would be
+    // another thing covering the street, and the street is the game.
+    this.readout.style.pointerEvents = 'auto';
+    this.readout.style.cursor = 'pointer';
+    this.readout.title = 'Spend essence';
     this.root.appendChild(this.readout);
 
     /* --- edge arrows pointing at nests --- */
@@ -98,6 +114,78 @@ export class CombatHud {
       pointerEvents: 'none',
     } satisfies Partial<CSSStyleDeclaration>);
     this.root.appendChild(this.markerLayer);
+
+    this.readout.addEventListener('click', () => this.onStatusTapped?.());
+
+    /* --- clearing a nest --- */
+    this.captureBox = document.createElement('div');
+    Object.assign(this.captureBox.style, {
+      position: 'absolute',
+      top: 'calc(env(safe-area-inset-top) + 44px)',
+      left: '50%',
+      transform: 'translateX(-50%)',
+      width: 'min(300px, 76vw)',
+      padding: '9px 12px',
+      borderRadius: '10px',
+      background: 'rgba(13,17,23,0.86)',
+      border: '1px solid rgba(192,132,252,0.5)',
+      display: 'none',
+      backdropFilter: 'blur(6px)',
+    } satisfies Partial<CSSStyleDeclaration>);
+
+    this.captureLabel = document.createElement('div');
+    Object.assign(this.captureLabel.style, {
+      font: '600 11px/1.3 system-ui, sans-serif',
+      color: '#e6edf3',
+      marginBottom: '6px',
+      textAlign: 'center',
+      letterSpacing: '0.04em',
+    } satisfies Partial<CSSStyleDeclaration>);
+
+    const captureTrack = document.createElement('div');
+    Object.assign(captureTrack.style, {
+      height: '6px',
+      borderRadius: '3px',
+      background: 'rgba(255,255,255,0.14)',
+      overflow: 'hidden',
+    } satisfies Partial<CSSStyleDeclaration>);
+    this.captureFill = document.createElement('div');
+    Object.assign(this.captureFill.style, {
+      height: '100%',
+      width: '0%',
+      background: '#c084fc',
+      transition: 'width 100ms linear',
+    } satisfies Partial<CSSStyleDeclaration>);
+    captureTrack.appendChild(this.captureFill);
+    this.captureBox.append(this.captureLabel, captureTrack);
+    this.root.appendChild(this.captureBox);
+
+    /* --- a short-lived message for good news --- */
+    this.toast = document.createElement('div');
+    Object.assign(this.toast.style, {
+      position: 'absolute',
+      top: '38%',
+      left: '50%',
+      transform: 'translateX(-50%)',
+      padding: '12px 20px',
+      borderRadius: '12px',
+      background: 'rgba(13,17,23,0.92)',
+      border: '1px solid rgba(192,132,252,0.55)',
+      color: '#e6edf3',
+      font: '600 14px/1.5 system-ui, sans-serif',
+      textAlign: 'center',
+      display: 'none',
+      transition: 'opacity 400ms ease',
+    } satisfies Partial<CSSStyleDeclaration>);
+    this.root.appendChild(this.toast);
+
+    /* --- the shop for permanent upgrades --- */
+    this.shopScreen = document.createElement('div');
+    this.styleOverlay(this.shopScreen);
+    this.shopScreen.style.overflowY = 'auto';
+    this.shopScreen.style.justifyContent = 'flex-start';
+    this.shopScreen.style.paddingTop = 'calc(env(safe-area-inset-top) + 24px)';
+    this.root.appendChild(this.shopScreen);
 
     /* --- level-up and death screens, hidden until needed --- */
     this.cardScreen = document.createElement('div');
@@ -278,7 +366,121 @@ ${data.distanceMetres.toFixed(0)} m`;
     }
   }
 
+  /** Show how far through destroying a nest we are, or hide it. */
+  updateCapture(progress: number, standingOnIt: boolean, distanceMetres: number): void {
+    if (progress <= 0 && !standingOnIt) {
+      this.captureBox.style.display = 'none';
+      return;
+    }
+    this.captureBox.style.display = 'block';
+    this.captureFill.style.width = `Math.min(1, progress) * 100` + '%';
+    this.captureFill.style.background = standingOnIt ? '#c084fc' : '#7c6f8a';
+    this.captureLabel.textContent = standingOnIt
+      ? 'DESTROYING NEST - hold your ground'
+      : 'step back within ' + distanceMetres.toFixed(0) + ' m or progress fades';
+  }
+
+  /** A nest is gone. Say so, briefly and happily. */
+  showNestCleared(reward: number, total: number): void {
+    this.toast.innerHTML =
+      '<div style="color:#c084fc;letter-spacing:0.1em;font-size:12px">NEST DESTROYED</div>' +
+      '<div style="margin-top:6px">+' + reward + ' essence</div>' +
+      '<div style="color:#9fb3c8;font-size:12px;margin-top:3px">' + total + ' banked</div>';
+    this.toast.style.display = 'block';
+    this.toast.style.opacity = '1';
+    setTimeout(() => (this.toast.style.opacity = '0'), 2600);
+    setTimeout(() => (this.toast.style.display = 'none'), 3100);
+  }
+
+  /**
+   * The shop. Deliberately reachable at any time, including mid-run: the brief
+   * forbids anything that makes a person hurry outdoors, and that includes
+   * hurrying back to a menu.
+   */
+  showShop(
+    essence: number,
+    levels: MetaLevels,
+    onBuy: (id: string) => void,
+    onClose: () => void
+  ): void {
+    this.shopScreen.innerHTML = '';
+
+    const heading = document.createElement('div');
+    heading.innerHTML =
+      '<div style="font:700 13px/1 ui-monospace,monospace;color:#c084fc;letter-spacing:0.16em">PERMANENT UPGRADES</div>' +
+      '<div style="font:600 20px/1.4 system-ui,sans-serif;color:#e6edf3">' + essence + ' essence</div>' +
+      '<div style="font:400 12px/1.5 system-ui,sans-serif;color:#9fb3c8;max-width:300px;text-align:center">Earned only by clearing nests on foot. Kept forever, unlike the cards inside a run.</div>';
+    heading.style.textAlign = 'center';
+    heading.style.marginBottom = '14px';
+    this.shopScreen.appendChild(heading);
+
+    for (const upgrade of META_UPGRADES) {
+      const owned = metaLevel(levels, upgrade.id);
+      const cost = costToBuy(upgrade, levels);
+      const affordable = cost !== null && essence >= cost;
+
+      const button = document.createElement('button');
+      Object.assign(button.style, {
+        width: 'min(340px, 88vw)',
+        marginBottom: '8px',
+        padding: '11px 14px',
+        borderRadius: '11px',
+        border: '1px solid rgba(255,255,255,0.14)',
+        background: affordable ? 'rgba(192,132,252,0.13)' : 'rgba(255,255,255,0.045)',
+        color: affordable ? '#e6edf3' : '#7d8fa1',
+        textAlign: 'left',
+        cursor: affordable ? 'pointer' : 'default',
+        display: 'flex',
+        gap: '12px',
+        alignItems: 'center',
+      } satisfies Partial<CSSStyleDeclaration>);
+
+      button.innerHTML =
+        '<span style="font-size:20px;width:26px;text-align:center">' + upgrade.glyph + '</span>' +
+        '<span style="flex:1">' +
+        '<span style="display:block;font:700 13px system-ui,sans-serif">' + upgrade.title +
+        ' <span style="color:#9fb3c8;font-weight:400">' + owned + '/' + upgrade.maxLevel + '</span></span>' +
+        '<span style="display:block;font:400 11.5px/1.35 system-ui,sans-serif;color:#9fb3c8">' + upgrade.description + '</span>' +
+        '</span>' +
+        '<span style="font:700 13px ui-monospace,monospace;color:' + (affordable ? '#c084fc' : '#5b6b7d') + '">' +
+        (cost === null ? 'MAX' : cost) + '</span>';
+
+      if (affordable) {
+        button.addEventListener('click', () => onBuy(upgrade.id));
+      }
+      this.shopScreen.appendChild(button);
+    }
+
+    const close = document.createElement('button');
+    close.textContent = 'Back to the street';
+    Object.assign(close.style, {
+      marginTop: '8px',
+      padding: '12px 24px',
+      borderRadius: '10px',
+      border: '1px solid rgba(255,255,255,0.2)',
+      background: 'rgba(255,255,255,0.08)',
+      color: '#e6edf3',
+      font: '600 13px system-ui, sans-serif',
+      cursor: 'pointer',
+    } satisfies Partial<CSSStyleDeclaration>);
+    close.addEventListener('click', () => {
+      this.shopScreen.style.display = 'none';
+      onClose();
+    });
+    this.shopScreen.appendChild(close);
+
+    this.shopScreen.style.display = 'flex';
+  }
+
+  shopIsOpen(): boolean {
+    return this.shopScreen.style.display === 'flex';
+  }
+
   isBlocking(): boolean {
-    return this.cardScreen.style.display === 'flex' || this.deathScreen.style.display === 'flex';
+    return (
+      this.cardScreen.style.display === 'flex' ||
+      this.deathScreen.style.display === 'flex' ||
+      this.shopScreen.style.display === 'flex'
+    );
   }
 }

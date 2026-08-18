@@ -37,11 +37,17 @@ export interface Nest {
   entityId: EntityId;
   /** Its own dice, so its monster mix is stable and server-free. */
   seed: number;
+  /** How much of the way through destroying it we are, 0 to 1. */
+  captureProgress: number;
+  /** True while the player is standing close enough to be clearing it. */
+  beingCaptured: boolean;
 }
 
 export interface CombatEvents {
   onLevelUp: (newLevel: number) => void;
   onDeath: () => void;
+  /** A nest has been destroyed. The reward is in essence. */
+  onNestCleared: (reward: number) => void;
 }
 
 export class Combat {
@@ -142,6 +148,8 @@ export class Combat {
         spawnTimer: TUNING.nests.startingSpawnIntervalSeconds,
         entityId,
         seed: worldSeed + i * 7919,
+        captureProgress: 0,
+        beingCaptured: false,
       });
     }
 
@@ -274,11 +282,53 @@ export class Combat {
   /* Nests                                                               */
   /* ------------------------------------------------------------------ */
 
-  private updateNests(deltaSeconds: number): void {
-    for (const nest of this.nests) {
-      nest.ageSeconds += deltaSeconds;
-      nest.spawnTimer -= deltaSeconds;
+  /**
+   * Where the player REALLY is, in metres. Set every frame by the game loop.
+   * Capture is measured from here rather than from the steered character,
+   * because the leash is far shorter than the distance to a nest -- so clearing
+   * one genuinely requires walking to it.
+   */
+  private anchorX = 0;
+  private anchorY = 0;
+  /** How much faster this player clears nests, from permanent upgrades. */
+  private captureSpeedMultiplier = 1;
 
+  setAnchor(x: number, y: number): void {
+    this.anchorX = x;
+    this.anchorY = y;
+  }
+
+  setCaptureSpeed(multiplier: number): void {
+    this.captureSpeedMultiplier = multiplier;
+  }
+
+  private updateNests(deltaSeconds: number): void {
+    for (let i = this.nests.length - 1; i >= 0; i--) {
+      const nest = this.nests[i];
+      nest.ageSeconds += deltaSeconds;
+
+      /* --- are you standing on top of it? --- */
+      const distanceToPlayer = Math.hypot(nest.x - this.anchorX, nest.y - this.anchorY);
+      nest.beingCaptured = distanceToPlayer < TUNING.capture.radiusMetres;
+
+      if (nest.beingCaptured) {
+        nest.captureProgress +=
+          (deltaSeconds / TUNING.capture.holdSeconds) * this.captureSpeedMultiplier;
+
+        if (nest.captureProgress >= 1) {
+          this.destroyNest(i);
+          continue;
+        }
+      } else if (nest.captureProgress > 0) {
+        // Drift back down rather than resetting. Stepping aside for a scooter
+        // must never cost a minute of standing there.
+        nest.captureProgress = Math.max(
+          0,
+          nest.captureProgress - (deltaSeconds / TUNING.capture.holdSeconds) * TUNING.capture.decayRate
+        );
+      }
+
+      nest.spawnTimer -= deltaSeconds;
       if (nest.spawnTimer > 0) continue;
       nest.spawnTimer = this.spawnIntervalFor(nest);
 
@@ -302,10 +352,74 @@ export class Combat {
     const progress = Math.min(1, nest.ageSeconds / TUNING.nests.escalationOverSeconds);
     // Ease in, so a fresh nest is gentle and a mature one is relentless.
     const eased = progress * progress;
-    return (
+    const interval =
       TUNING.nests.startingSpawnIntervalSeconds +
-      (TUNING.nests.fastestSpawnIntervalSeconds - TUNING.nests.startingSpawnIntervalSeconds) * eased
+      (TUNING.nests.fastestSpawnIntervalSeconds - TUNING.nests.startingSpawnIntervalSeconds) * eased;
+
+    // A nest being destroyed fights back. This is the "hold position under heavy
+    // attack" the brief asks for -- and it is why clearing one is a decision
+    // rather than an errand.
+    return nest.beingCaptured
+      ? interval / TUNING.capture.spawnMultiplierWhileCapturing
+      : interval;
+  }
+
+  /** A nest is finished. Pay out, remove it, and let a new one rise elsewhere. */
+  private destroyNest(index: number): void {
+    const nest = this.nests[index];
+    const reward = Math.round(
+      TUNING.capture.baseReward + (nest.ageSeconds / 60) * TUNING.capture.rewardPerMinuteAlive
     );
+
+    this.entities.release(nest.entityId);
+    this.nests.splice(index, 1);
+
+    // The world does not stay quiet. A replacement rises somewhere else, which
+    // is what keeps the loop turning.
+    const spot = this.findOpenSpot(
+      seededRandom(nest.seed + Math.round(this.runTimeSeconds)),
+      TUNING.nests.minDistanceMetres,
+      TUNING.nests.maxDistanceMetres
+    );
+    if (spot) {
+      const entityId = this.entities.spawn(
+        EntityKind.NEST,
+        this.collision.toLng(spot.x),
+        this.collision.toLat(spot.y),
+        TUNING.nests.radiusMetres
+      );
+      if (entityId >= 0) {
+        this.nests.push({
+          x: spot.x,
+          y: spot.y,
+          ageSeconds: 0,
+          spawnTimer: TUNING.nests.startingSpawnIntervalSeconds,
+          entityId,
+          seed: nest.seed + 104729,
+          captureProgress: 0,
+          beingCaptured: false,
+        });
+      }
+    }
+
+    this.events.onNestCleared(reward);
+  }
+
+  /** The nest currently being cleared, if any, for the progress ring. */
+  capturingNest(): Nest | null {
+    for (const nest of this.nests) {
+      if (nest.beingCaptured || nest.captureProgress > 0) return nest;
+    }
+    return null;
+  }
+
+  /** How far the nearest nest is from your REAL position, in metres. */
+  nearestNestDistance(): number {
+    let best = Infinity;
+    for (const nest of this.nests) {
+      best = Math.min(best, Math.hypot(nest.x - this.anchorX, nest.y - this.anchorY));
+    }
+    return best;
   }
 
   private spawnMonster(nest: Nest): void {

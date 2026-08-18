@@ -71,6 +71,10 @@ async function boot(): Promise<void> {
   // map, the leashed character, the joystick and the combat camera.
   const game = new Game(mapView.map, uiContainer, startAt, mapView.isUsingMirror());
 
+  // The game banks essence into the profile and reads permanent upgrades back
+  // out of it, so it needs the handle before anything can be cleared.
+  game.profile = profile;
+
   // 5. THE INTERFACE -------------------------------------------------------
   const hud = new Hud(uiContainer, () => {
     const anchor = location.current().anchor;
