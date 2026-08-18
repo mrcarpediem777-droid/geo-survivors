@@ -159,6 +159,41 @@ You can watch this working in the dev panel: drag the fake GPS marker a long way
 
 ---
 
+## If the map is blank: the tile mirror
+
+**A real thing that happened, and is now handled automatically.**
+
+On a mobile network in Da Nang, the game showed a white screen with the blue dot
+floating on it. The phone was fine, Chrome was fine, the graphics were fine, and the map
+even drew a frame. But requests for map data **hung forever and never returned an error**
+— and the same happened with a completely separate map provider, while our own page
+loaded instantly. That network simply does not deliver anything from the map servers.
+
+**The fix:** the game re-routes every map request through our own web address
+(`geo-survivors.vercel.app/maptiles/...`), which the same network allows without
+complaint. Vercel forwards it on. The game tries the direct route first, and only falls
+back to the mirror if nothing arrives within about 12 seconds.
+
+**It only has to discover this once.** The choice is saved on the phone, so the next
+launch goes straight to the mirror with no delay.
+
+The subtle part, in case it ever needs revisiting: the map's recipe file lists its data
+with full web addresses pointing back at the blocked servers. So mirroring just the first
+request is not enough — **every** request has to be rewritten. That happens in one place,
+`transformRequest` in `src/map/mapView.ts`.
+
+> ⚠️ **Two files must be kept in step:** `vercel.json` (the live site) and the `proxy`
+> section of `vite.config.ts` (your computer). They set up the same mirror in the two
+> places the game runs. Change one, change the other.
+
+> 💰 **Cost note:** mirrored map data travels through Vercel and counts toward its free
+> allowance (100 GB/month). Only players whose network needs the mirror use it, so today
+> that is a handful of testers and nowhere near the limit. If the game ever gets popular
+> in a region that needs mirroring, this becomes a real bill and we should host map data
+> properly instead. Flagging it now so it is not a surprise later.
+
+---
+
 ## Battery — please read before testing outdoors
 
 This game keeps the screen on, uses GPS continuously, and draws constantly. That is close
@@ -182,6 +217,7 @@ mode** toggle that reduces monster counts and map redraws. Until then:
 | **`building-3d` layer unused** | The map style has 3D buildings we currently ignore. Might be useful for line-of-sight in M3, might just cost frames. To be decided. |
 | **Bundle is 960 kB** | Almost all of it is the map library itself (250 kB once compressed, which is fine on mobile data). Not worth optimising yet. |
 | **Desktop location is approximate** | On a computer there is no GPS chip, so the browser guesses from your internet connection. Use fake GPS for real testing. |
+| **Map mirror costs bandwidth** | See the tile mirror section above. Fine at prototype scale, needs a proper solution if the game grows in an affected region. |
 | **OSM building coverage varies** | Building shapes come from OpenStreetMap, and coverage is excellent in some places and thin in others. **This is the single biggest open question for M3** and we should check your actual neighbourhood early. |
 
 ---
