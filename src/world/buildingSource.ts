@@ -46,8 +46,12 @@ import { activeBasemap } from '../config/basemap';
  */
 export const BUILDING_TILE_ZOOM = 14;
 
+/** What a ring represents, since water and buildings block movement alike. */
+export type ObstacleKind = 'building' | 'water';
+
 /** One building: a closed loop of longitude/latitude corners. */
 export interface BuildingRing {
+  kind: ObstacleKind;
   /** Corner coordinates, flattened as lng, lat, lng, lat, ... */
   coords: Float64Array;
   /** Bounding box, so we can reject far-away buildings cheaply. */
@@ -207,16 +211,21 @@ export class BuildingSource {
     }
 
     const tile = new VectorTile(new PbfReader(bytes));
-    const layer = tile.layers[activeBasemap.buildingSourceLayer];
-    if (!layer) {
-      this.stats.tilesEmpty++;
-      return [];
-    }
-
     const bounds = tileBounds(x, y, zoom);
 
     const rings: BuildingRing[] = [];
     let droppedAsDuplicate = 0;
+
+    // Buildings and water both stop things moving, so they are read the same way
+    // and only differ by the label we attach.
+    const sources: [string, ObstacleKind][] = [
+      [activeBasemap.buildingSourceLayer, 'building'],
+      [activeBasemap.waterSourceLayer, 'water'],
+    ];
+
+    for (const [layerName, kind] of sources) {
+    const layer = tile.layers[layerName];
+    if (!layer) continue;
 
     for (let i = 0; i < layer.length; i++) {
       // `toGeoJSON` converts the tile's own compact numbering into real
@@ -273,8 +282,9 @@ export class BuildingSource {
           continue;
         }
 
-        rings.push({ coords, minLng, minLat, maxLng, maxLat });
+        rings.push({ kind, coords, minLng, minLat, maxLng, maxLat });
       }
+    }
     }
 
     this.stats.buildingsParsed += rings.length;
