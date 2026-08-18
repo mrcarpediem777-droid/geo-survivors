@@ -139,10 +139,24 @@ export class FlowField {
   update(playerX: number, playerY: number, nowMs: number): boolean {
     const started = performance.now();
 
-    const startCx = this.worldToCellX(playerX);
-    const startCy = this.worldToCellY(playerY);
+    let startCx = this.worldToCellX(playerX);
+    let startCy = this.worldToCellY(playerY);
     if (startCx < 1 || startCy < 1 || startCx >= SIZE - 1 || startCy >= SIZE - 1) {
       return false;
+    }
+
+    // IF THE PLAYER IS INSIDE A BUILDING, FLOOD FROM THE NEAREST DOORSTEP.
+    //
+    // This is not a rare edge case -- it is what happens to anybody testing
+    // indoors, which is most first attempts. GPS puts them inside a shop or a
+    // flat, the flood starts in a sealed room, nothing outside it is reachable,
+    // so no nest can be placed and the game appears completely dead. Nothing on
+    // screen explains why, because from the code's point of view nothing failed.
+    if (this.blocked[startCy * SIZE + startCx]) {
+      const escaped = this.nearestOpenCell(startCx, startCy);
+      if (!escaped) return false;
+      startCx = escaped.cx;
+      startCy = escaped.cy;
     }
 
     this.distance.fill(UNREACHABLE);
@@ -219,6 +233,24 @@ export class FlowField {
     this.lastBuildMs = nowMs;
     this.stats.lastBuildMs = performance.now() - started;
     return true;
+  }
+
+  /** Search outward for the closest square that is not inside a building. */
+  private nearestOpenCell(cx: number, cy: number): { cx: number; cy: number } | null {
+    // 40 rings at 3 m a ring is 120 m -- further than any building is wide.
+    for (let ring = 1; ring < 40; ring++) {
+      for (let dx = -ring; dx <= ring; dx++) {
+        for (let dy = -ring; dy <= ring; dy++) {
+          // Only the edge of each ring, so squares are not retested.
+          if (Math.abs(dx) !== ring && Math.abs(dy) !== ring) continue;
+          const nx = cx + dx;
+          const ny = cy + dy;
+          if (nx < 1 || ny < 1 || nx >= SIZE - 1 || ny >= SIZE - 1) continue;
+          if (!this.blocked[ny * SIZE + nx]) return { cx: nx, cy: ny };
+        }
+      }
+    }
+    return null;
   }
 
   private bucketsEmpty(): boolean {
