@@ -34,6 +34,12 @@ export interface ProfileData {
    * rectangle for the two seconds the GPS takes to wake up.
    */
   lastKnownPosition: { lat: number; lng: number } | null;
+  /**
+   * True once we have discovered that this phone's network will not deliver map
+   * data directly and we had to route it through our own website. Remembering it
+   * means the player never sits through that 12-second discovery twice.
+   */
+  useTileMirror: boolean;
 }
 
 const STORAGE_KEY = 'geo-survivors.profile';
@@ -47,6 +53,7 @@ function freshProfile(): ProfileData {
     createdAtMs: Date.now(),
     sessionCount: 0,
     lastKnownPosition: null,
+    useTileMirror: false,
   };
 }
 

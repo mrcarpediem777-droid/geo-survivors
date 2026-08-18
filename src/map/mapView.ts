@@ -20,7 +20,13 @@
 import { Map as MapLibreMap, Marker, type GeoJSONSource } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
-import { activeBasemap, BASEMAPS, type BasemapOption } from '../config/basemap';
+import {
+  activeBasemap,
+  BASEMAPS,
+  throughMirror,
+  mirroredStyleUrl,
+  type BasemapOption,
+} from '../config/basemap';
 import { TUNING } from '../config/tuning';
 import type { LatLng } from '../location/geo';
 import { offsetByMetres } from '../location/geo';
@@ -37,6 +43,8 @@ export interface MapDiagnostics {
   webglDetail: string;
   /** Which map provider we ended up using. */
   basemap: string;
+  /** Are we routing map data through our own website? */
+  usingMirror: boolean;
   /** Has the map recipe file downloaded and been understood? */
   styleLoaded: boolean;
   /** Has the map drawn even one frame? */
@@ -96,11 +104,21 @@ export class MapView {
   private errors: string[] = [];
   private startedAtMs = Date.now();
   private triedBackup = false;
+  private useMirror = false;
+  private onMirrorEnabledCallback: (() => void) | null = null;
 
-  constructor(containerId: string, startAt: LatLng) {
+  /**
+   * @param startWithMirror  skip straight to routing map data through our own
+   *   website. We remember this between sessions, so a player on a network that
+   *   blocks the map servers does not have to sit through the 12-second
+   *   discovery every single time they open the game.
+   */
+  constructor(containerId: string, startAt: LatLng, startWithMirror = false) {
+    this.useMirror = startWithMirror;
+
     this.map = new MapLibreMap({
       container: containerId,
-      style: this.basemap.styleUrl,
+      style: this.useMirror ? mirroredStyleUrl(this.basemap) : this.basemap.styleUrl,
       center: [startAt.lng, startAt.lat],
       zoom: TUNING.camera.startZoom,
       pitch: TUNING.camera.pitch,
@@ -119,6 +137,16 @@ export class MapView {
 
       // Do not let a double-tap zoom fight with the joystick in M2.
       doubleClickZoom: false,
+
+      // EVERY request the map makes passes through here first -- the style file,
+      // every tile, the icons, the fonts. When mirror mode is on we rewrite each
+      // one to go through our own website. This is the only place that needs to
+      // know about it, which is why it works even for addresses written inside
+      // the style file itself.
+      transformRequest: (url: string) => {
+        if (!this.useMirror) return { url };
+        return { url: throughMirror(this.basemap, url) };
+      },
     });
 
     this.wireUpDiagnostics();
@@ -172,6 +200,7 @@ export class MapView {
       webgl2: this.webgl.ok,
       webglDetail: this.webgl.detail,
       basemap: this.basemap.label,
+      usingMirror: this.useMirror,
       styleLoaded: this.map.isStyleLoaded() === true,
       firstRenderDone: this.firstRenderDone,
       tilesRequested: this.tilesRequested,
@@ -204,12 +233,21 @@ export class MapView {
       return;
     }
 
+    // Recovery ladder, cheapest and most likely fix first. We only bother the
+    // player once every rung has failed.
+    //   1. route everything through our own website (beats a network that
+    //      silently swallows requests to the map servers)
+    //   2. try the other map provider entirely (beats one provider being down)
+    //   3. give up and explain
     const timer = setInterval(() => {
       if (!this.looksBroken()) {
         if (this.tilesLoaded > 0) clearInterval(timer); // it worked; stop watching
         return;
       }
-      // First failure: silently try the other provider before bothering anyone.
+      if (!this.useMirror) {
+        this.switchToMirror();
+        return;
+      }
       if (!this.triedBackup) {
         this.switchToBackupBasemap();
         return;
@@ -217,6 +255,46 @@ export class MapView {
       clearInterval(timer);
       callback(this.getDiagnostics());
     }, 4000);
+  }
+
+  /**
+   * Stop talking to the map provider directly and route everything through our
+   * own website instead.
+   *
+   * This is the fix for a network that accepts our website but silently swallows
+   * requests to the map servers -- observed for real on a mobile network in
+   * Da Nang, where tile requests simply hung with no error of any kind.
+   */
+  private switchToMirror(): void {
+    if (this.useMirror) return;
+    this.useMirror = true;
+
+    console.warn('[map] direct tiles did not arrive, routing through our own site');
+    this.errors.push('switched to same-origin mirror');
+
+    this.resetLoadCounters();
+    // Re-fetching the style makes every follow-up request go through
+    // transformRequest again, so tiles, icons and fonts all get mirrored too.
+    this.map.setStyle(mirroredStyleUrl(this.basemap));
+
+    // Let whoever cares remember this, so next launch skips the discovery.
+    this.onMirrorEnabledCallback?.();
+  }
+
+  /** Be told when we had to fall back to the mirror, so it can be remembered. */
+  onMirrorEnabled(callback: () => void): void {
+    this.onMirrorEnabledCallback = callback;
+  }
+
+  isUsingMirror(): boolean {
+    return this.useMirror;
+  }
+
+  /** Judge each new attempt on its own merits, not the failed one before it. */
+  private resetLoadCounters(): void {
+    this.tilesRequested = 0;
+    this.tilesLoaded = 0;
+    this.startedAtMs = Date.now();
   }
 
   /**
@@ -235,12 +313,10 @@ export class MapView {
     this.errors.push(`switched to backup provider: ${backup.label}`);
     this.basemap = backup;
 
-    // Reset the counters so the backup is judged on its own merits.
-    this.tilesRequested = 0;
-    this.tilesLoaded = 0;
-    this.startedAtMs = Date.now();
-
-    this.map.setStyle(backup.styleUrl);
+    this.resetLoadCounters();
+    // Keep mirroring if that is how we got here -- the backup provider is just
+    // as likely to be unreachable on a network that blocked the first one.
+    this.map.setStyle(this.useMirror ? mirroredStyleUrl(backup) : backup.styleUrl);
   }
 
   /** Which map provider are we currently using? */

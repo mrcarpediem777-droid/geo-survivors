@@ -49,7 +49,12 @@ async function boot(): Promise<void> {
 
   // 2. THE MAP -------------------------------------------------------------
   const startAt = profile.get().lastKnownPosition ?? FALLBACK_START;
-  const mapView = new MapView('map', startAt);
+  // If this network needed the mirror last time, start with it rather than
+  // rediscovering the hard way.
+  const mapView = new MapView('map', startAt, profile.get().useTileMirror);
+
+  // ...and if we discover it now, remember it for next time.
+  mapView.onMirrorEnabled(() => profile.update({ useTileMirror: true }));
 
   // 3. WHERE THE PLAYER IS -------------------------------------------------
   const location = new PlayerLocation();

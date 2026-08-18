@@ -33,6 +33,21 @@ export interface BasemapOption {
   buildingSourceLayer: string;
   /** The id of the vector data source inside the style, needed to query shapes. */
   vectorSourceId: string;
+  /**
+   * The web address all of this provider's data comes from.
+   *
+   * WHY WE NEED THIS: some networks (a real example: a mobile network in Da Nang,
+   * Vietnam) simply do not deliver anything from these addresses -- the requests
+   * hang forever rather than failing, so you get a white screen and no error.
+   * When that happens we re-route every single map request through our OWN
+   * website instead, which those networks do allow. See `mirrorPath`.
+   */
+  tileOrigin: string;
+  /**
+   * The path on our own site that forwards to `tileOrigin`.
+   * The forwarding itself is set up in `vercel.json` in the project root.
+   */
+  mirrorPath: string;
   /** Attribution we are legally required to show. */
   attribution: string;
   /** Plain-language note for the designer. */
@@ -50,6 +65,8 @@ export const BASEMAPS: Record<string, BasemapOption> = {
     styleUrl: 'https://tiles.openfreemap.org/styles/liberty',
     buildingSourceLayer: 'building',
     vectorSourceId: 'openmaptiles',
+    tileOrigin: 'https://tiles.openfreemap.org',
+    mirrorPath: '/maptiles',
     attribution: '© OpenStreetMap contributors, © OpenFreeMap',
     notes:
       'Free forever, no key. Good building coverage wherever OSM has it. ' +
@@ -68,6 +85,8 @@ export const BASEMAPS: Record<string, BasemapOption> = {
     styleUrl: 'https://tiles.versatiles.org/assets/styles/colorful/style.json',
     buildingSourceLayer: 'building',
     vectorSourceId: 'versatiles-shortbread',
+    tileOrigin: 'https://tiles.versatiles.org',
+    mirrorPath: '/maptiles-backup',
     attribution: '© OpenStreetMap contributors, © Versatiles',
     notes:
       'Independent backup provider in case OpenFreeMap has an outage. ' +
@@ -82,3 +101,24 @@ export const BASEMAPS: Record<string, BasemapOption> = {
 export const ACTIVE_BASEMAP_ID = 'liberty';
 
 export const activeBasemap: BasemapOption = BASEMAPS[ACTIVE_BASEMAP_ID];
+
+/**
+ * Rewrite one map request so it goes through our own website instead of straight
+ * to the map provider.
+ *
+ * Example:
+ *   https://tiles.openfreemap.org/planet/.../14/13116/7451.pbf
+ *   becomes
+ *   /maptiles/planet/.../14/13116/7451.pbf
+ *
+ * Anything not belonging to the provider is left completely alone.
+ */
+export function throughMirror(basemap: BasemapOption, url: string): string {
+  if (!url.startsWith(basemap.tileOrigin)) return url;
+  return basemap.mirrorPath + url.slice(basemap.tileOrigin.length);
+}
+
+/** The provider's own style file, but served via our website. */
+export function mirroredStyleUrl(basemap: BasemapOption): string {
+  return throughMirror(basemap, basemap.styleUrl);
+}

@@ -8,6 +8,23 @@ export default defineConfig({
     // on the same wifi. Note: GPS will NOT work over plain wifi (see PLAYBOOK.md),
     // which is why we deploy to Vercel for real phone testing.
     port: 5173,
+
+    // The same map mirror that `vercel.json` sets up on the live site, repeated
+    // here so the dev server behaves identically. Without this, mirror mode
+    // could only ever be tested by deploying, which is a terrible way to work.
+    // KEEP THESE TWO FILES IN STEP.
+    proxy: {
+      '/maptiles-backup': {
+        target: 'https://tiles.versatiles.org',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/maptiles-backup/, ''),
+      },
+      '/maptiles': {
+        target: 'https://tiles.openfreemap.org',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/maptiles/, ''),
+      },
+    },
   },
   build: {
     outDir: 'dist',
