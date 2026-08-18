@@ -11,6 +11,29 @@
  * If a number affects feel, it belongs in this file.
  */
 
+/**
+ * One flavour of monster. The shooting fields are optional because only the
+ * spitter uses them -- describing that explicitly is what lets the rest of the
+ * code ask "does this one shoot?" without guessing.
+ */
+export interface MonsterType {
+  name: string;
+  /** REAL metres per second. Must stay under 1.4 -- see the note below. */
+  speedMps: number;
+  health: number;
+  damagePerSecond: number;
+  radiusMetres: number;
+  xp: number;
+  colour: [number, number, number, number];
+  /** Relative chance of a nest producing this one. */
+  weight: number;
+  /** Shooters only: how far away they stop and open fire. */
+  rangeMetres?: number;
+  reloadSeconds?: number;
+  shotDamage?: number;
+  shotSpeedMps?: number;
+}
+
 export const TUNING = {
   /* ---------------------------------------------------------------------- */
   /* CAMERA -- how close the map is, and how it moves                        */
@@ -152,6 +175,183 @@ export const TUNING = {
      * drawn circle so you can slip down alleys that look passable.
      */
     playerCollisionRadiusMetres: 2.2,
+  },
+
+  /* ---------------------------------------------------------------------- */
+  /* MONSTERS                                                                */
+  /* ---------------------------------------------------------------------- */
+  monsters: {
+    /**
+     * READ THIS BEFORE CHANGING ANY SPEED.
+     *
+     * Every monster speed below is in REAL metres per second, and every one is
+     * under 1.4 -- the speed of a walking human. That is a safety rule from the
+     * brief, not a balance choice: it guarantees you can always walk away from
+     * any fight at a normal pace. Nothing in this game may ever require somebody
+     * to hurry in the real world.
+     *
+     * A consequence worth understanding: the character you steer moves at 22 m/s
+     * inside its 28 m leash, which is roughly twenty times faster than the
+     * monsters. That is deliberate. The danger is NOT that monsters catch you --
+     * it is that hundreds of them close in from every side at once and leave you
+     * nowhere to stand. Pressure comes from numbers and encirclement, not speed.
+     *
+     * If combat ever feels toothless, raise their NUMBERS, not their speed.
+     */
+    types: [
+      {
+        name: 'swarmer',
+        /** Fast, weak, arrives in crowds. The bread and butter. */
+        speedMps: 1.3,
+        health: 10,
+        damagePerSecond: 6,
+        radiusMetres: 1.6,
+        xp: 1,
+        colour: [220, 70, 70, 255],
+        weight: 70,
+      },
+      {
+        name: 'brute',
+        /** Slow and tough. Blocks alleys and soaks damage. */
+        speedMps: 0.75,
+        health: 60,
+        damagePerSecond: 14,
+        radiusMetres: 2.8,
+        xp: 5,
+        colour: [180, 60, 110, 255],
+        weight: 20,
+      },
+      {
+        name: 'spitter',
+        /**
+         * Stops at a distance and shoots. Its shots are stopped by real
+         * buildings, so ducking behind a house genuinely saves you -- this is
+         * the type that makes the map matter tactically.
+         */
+        speedMps: 1.0,
+        health: 18,
+        damagePerSecond: 0,
+        radiusMetres: 1.8,
+        xp: 3,
+        colour: [230, 140, 50, 255],
+        weight: 10,
+        rangeMetres: 34,
+        reloadSeconds: 2.4,
+        shotDamage: 9,
+        shotSpeedMps: 26,
+      },
+    ] as MonsterType[],
+
+    /** Monsters further than this from the player give up and vanish. */
+    despawnBeyondMetres: 320,
+    /**
+     * How hard monsters push each other apart, so a crowd spreads into a mass
+     * rather than stacking into one dot. Costs performance -- see the note in
+     * PLAYBOOK about the spatial grid.
+     */
+    separationStrength: 3.2,
+    /**
+     * If a monster makes no progress for this long, it shoves itself sideways.
+     * Real buildings have awkward corners and a swarm will find every one.
+     */
+    unstickAfterSeconds: 0.7,
+  },
+
+  /* ---------------------------------------------------------------------- */
+  /* NESTS -- where monsters come from                                       */
+  /* ---------------------------------------------------------------------- */
+  nests: {
+    /** How many exist in each patch of world. */
+    countPerCell: 2,
+    /**
+     * How far from you they are placed, in metres.
+     *
+     * This is a tighter constraint than it looks. Monsters must stay slower
+     * than a walking human, so a nest 200 m away takes them over two and a half
+     * minutes to reach you -- measured, and it made the opening of a run
+     * completely empty. Nests have to be close enough that something is always
+     * arriving, yet far enough that walking to one is a real journey.
+     *   CLOSER  = pressure arrives sooner, nests feel less like a destination.
+     *   FURTHER = long quiet openings. Below about 100 m the wait disappears.
+     */
+    minDistanceMetres: 70,
+    maxDistanceMetres: 170,
+    /** Seconds between monsters when a nest is brand new. */
+    startingSpawnIntervalSeconds: 2.2,
+    /**
+     * The shortest a nest's spawn interval can get, however long it lives.
+     * This is the ceiling on how bad things can become if you ignore it.
+     */
+    fastestSpawnIntervalSeconds: 0.28,
+    /**
+     * How long a nest takes to reach full fury, in seconds.
+     *   SHORTER = pressure escalates alarmingly; a nest is an emergency.
+     *   LONGER  = you can safely ignore a nest for a while.
+     */
+    escalationOverSeconds: 240,
+    /** A nest will not have more than this many of its monsters alive at once. */
+    maxAlivePerNest: 220,
+    /** How big a nest looks, in metres. */
+    radiusMetres: 6,
+  },
+
+  /* ---------------------------------------------------------------------- */
+  /* THE PLAYER IN COMBAT                                                    */
+  /* ---------------------------------------------------------------------- */
+  player: {
+    maxHealth: 100,
+    /** Health regained per second, so small mistakes are not permanent. */
+    healthRegenPerSecond: 0.8,
+    /** Seconds of protection after being hit, so a crowd cannot delete you. */
+    invulnerableAfterHitSeconds: 0.55,
+    /** How close an experience orb must be before it flies to you. */
+    pickupRadiusMetres: 14,
+    /** How fast orbs fly in once they notice you. */
+    pickupSpeedMps: 34,
+  },
+
+  /* ---------------------------------------------------------------------- */
+  /* WEAPONS -- these fire themselves; the player never aims                 */
+  /* ---------------------------------------------------------------------- */
+  weapons: {
+    /** The weapon everyone starts with. */
+    startingBoltDamage: 7,
+    startingBoltIntervalSeconds: 0.85,
+    startingBoltRangeMetres: 42,
+    startingBoltSpeedMps: 40,
+    /** How long a shot lives before fading, in seconds. */
+    projectileLifetimeSeconds: 2.2,
+  },
+
+  /* ---------------------------------------------------------------------- */
+  /* LEVELLING                                                               */
+  /* ---------------------------------------------------------------------- */
+  levelling: {
+    /** Experience needed for the first level. */
+    firstLevelXp: 5,
+    /**
+     * Each level costs this much more than the last.
+     *   1.0  = every level costs the same, so they keep coming.
+     *   1.35 = levels slow down noticeably, so early choices matter more.
+     */
+    xpGrowthPerLevel: 1.28,
+    /** How many upgrade cards to offer at each level-up. */
+    cardsOffered: 3,
+  },
+
+  /* ---------------------------------------------------------------------- */
+  /* MONSTER NAVIGATION                                                      */
+  /* ---------------------------------------------------------------------- */
+  navigation: {
+    /**
+     * How often the whole swarm's routes are recalculated, in milliseconds.
+     * This is ONE calculation shared by every monster, so it is cheap -- but it
+     * is not free, and it does not need to be instant.
+     *   LOWER  = monsters react to your movement faster, more work per second.
+     *   HIGHER = monsters briefly keep heading where you WERE. At 250 ms you
+     *            would have to sprint to notice.
+     */
+    recalculateEveryMs: 250,
   },
 
   /* ---------------------------------------------------------------------- */

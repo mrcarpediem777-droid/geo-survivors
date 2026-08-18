@@ -74,11 +74,21 @@ export class PlayerCharacter {
    * @param anchor       your real, smoothed position
    * @param input        which way the thumb is pushing
    */
-  update(deltaSeconds: number, anchor: LatLng | null, input: JoystickInput): void {
+  update(
+    deltaSeconds: number,
+    anchor: LatLng | null,
+    input: JoystickInput,
+    /** From upgrade cards: 1 = unchanged. */
+    speedMultiplier = 1,
+    /** From upgrade cards: extra metres of rope. */
+    leashBonusMetres = 0
+  ): void {
     if (!anchor) return;
 
+    const radius = TUNING.leash.radiusMetres + leashBonusMetres;
+
     // First fix, or the anchor jumped absurdly far: just appear there.
-    if (!this.placed || distanceMetres(anchor, this.position) > TUNING.leash.radiusMetres * 6) {
+    if (!this.placed || distanceMetres(anchor, this.position) > radius * 6) {
       this.snapTo(anchor);
       return;
     }
@@ -89,7 +99,7 @@ export class PlayerCharacter {
       // Clamp to 1 so pushing diagonally is not faster than pushing straight,
       // but allow gentler pushes to move more slowly.
       const strength = Math.min(push, 1);
-      const step = TUNING.leash.characterSpeedMps * strength * deltaSeconds;
+      const step = TUNING.leash.characterSpeedMps * speedMultiplier * strength * deltaSeconds;
 
       this.position = offsetByMetres(
         this.position,
@@ -103,7 +113,6 @@ export class PlayerCharacter {
     // edge rather than snapping. Snapping feels like a bug; easing feels like
     // being gently pulled, which is exactly what it is.
     const distance = distanceMetres(anchor, this.position);
-    const radius = TUNING.leash.radiusMetres;
 
     if (distance > radius) {
       const overshoot = distance - radius;
