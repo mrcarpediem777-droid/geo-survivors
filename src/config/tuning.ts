@@ -123,6 +123,38 @@ export const TUNING = {
   },
 
   /* ---------------------------------------------------------------------- */
+  /* WALLS -- real buildings, and what to do when there are none             */
+  /* ---------------------------------------------------------------------- */
+  walls: {
+    /**
+     * How far around you we load buildings, in metres. Needs to comfortably
+     * exceed the navigation view, so monsters never walk through a house that
+     * happens to be just off screen.
+     */
+    loadRadiusMetres: 700,
+    /**
+     * Walk this far from where the walls were last worked out and we rebuild
+     * them. Bigger means less work; smaller means the edge of the world stays
+     * further away. This never happens per frame -- only when you travel.
+     */
+    rebuildAfterMovingMetres: 250,
+    /**
+     * Below this many real buildings nearby, we decide the neighbourhood is too
+     * empty for a good fight and generate obstacles instead.
+     * Measured for scale: central London gives ~1545 buildings per km2, Da Nang
+     * ~225, and an unmapped area 0.
+     */
+    tooFewBuildingsForAFight: 25,
+    /** How many obstacles to invent when there is nothing real to fight around. */
+    fallbackObstacleCount: 18,
+    /**
+     * How wide the player is, for bumping into things. Slightly smaller than the
+     * drawn circle so you can slip down alleys that look passable.
+     */
+    playerCollisionRadiusMetres: 2.2,
+  },
+
+  /* ---------------------------------------------------------------------- */
   /* PERFORMANCE                                                             */
   /* ---------------------------------------------------------------------- */
   performance: {

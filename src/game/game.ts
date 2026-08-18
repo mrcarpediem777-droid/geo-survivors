@@ -24,7 +24,13 @@ import { PlayerCharacter } from './playerCharacter';
 import { GameCamera } from './gameCamera';
 import { Joystick } from '../ui/joystick';
 import type { LatLng } from '../location/geo';
-import { offsetByMetres } from '../location/geo';
+import { offsetByMetres, distanceMetres } from '../location/geo';
+import { CollisionWorld } from '../world/collision';
+import { BuildingSource } from '../world/buildingSource';
+import { addFallbackArena } from '../world/fallbackArena';
+import { worldCellFor } from '../world/determinism';
+import { activeBasemap } from '../config/basemap';
+import { TUNING } from '../config/tuning';
 
 /**
  * How many things can exist at once. The brief targets 400 monsters, so this
@@ -36,12 +42,26 @@ const ENTITY_CAPACITY = 1200;
 const PLAYER_RADIUS_M = 3;
 const TEST_MARKER_RADIUS_M = 2.5;
 
+export interface WallStats {
+  /** Walls currently loaded. */
+  wallCount: number;
+  /** How many of those are real buildings rather than invented ones. */
+  realBuildings: number;
+  /** How many were generated because the area was too empty. */
+  generated: number;
+  /** Are we currently standing in a place with no real buildings? */
+  usingFallbackArena: boolean;
+  tilesFetched: number;
+  loading: boolean;
+}
+
 export interface GameStats {
   fps: number;
   entitiesAlive: number;
   entitiesDrawn: number;
   inCombat: boolean;
   zoom: number;
+  walls: WallStats;
   leashTension: number;
   distanceFromAnchor: number;
 }
@@ -53,8 +73,20 @@ export class Game {
   readonly joystick: Joystick;
   readonly character: PlayerCharacter;
 
+  readonly collision = new CollisionWorld();
+  readonly buildings: BuildingSource;
+
   private map: MapLibreMap;
   private playerEntity: EntityId = -1;
+
+  /** Where the walls were last worked out, so we know when to redo them. */
+  private wallsBuiltAt: LatLng | null = null;
+  private wallsLoading = false;
+  private realBuildingCount = 0;
+  private generatedCount = 0;
+
+  /** Reused every frame so collision allocates nothing. */
+  private resolved = { x: 0, y: 0 };
 
   /** Your real smoothed position, handed in from the location module. */
   private anchor: LatLng | null = null;
@@ -67,8 +99,9 @@ export class Game {
   private fpsAccumulatorMs = 0;
   private measuredFps = 0;
 
-  constructor(map: MapLibreMap, uiContainer: HTMLElement, startAt: LatLng) {
+  constructor(map: MapLibreMap, uiContainer: HTMLElement, startAt: LatLng, useMirror = false) {
     this.map = map;
+    this.buildings = new BuildingSource(useMirror);
     this.layer = new EntityLayer(this.entities);
     this.camera = new GameCamera(map);
     this.joystick = new Joystick(uiContainer);
@@ -153,6 +186,48 @@ export class Game {
       this.camera.snapTo(anchor);
       this.spawnTestMarkers(anchor);
     }
+
+    // Work out the walls when we arrive, and again only after real travel --
+    // never per frame, as the brief requires.
+    const moved = this.wallsBuiltAt ? distanceMetres(this.wallsBuiltAt, anchor) : Infinity;
+    if (!this.wallsLoading && moved > TUNING.walls.rebuildAfterMovingMetres) {
+      void this.rebuildWalls(anchor);
+    }
+  }
+
+  /**
+   * Fetch the real buildings around a point and turn them into walls. If the
+   * neighbourhood turns out to be nearly empty, invent some obstacles so the
+   * fight still has shape.
+   */
+  async rebuildWalls(around: LatLng): Promise<void> {
+    if (this.wallsLoading) return;
+    this.wallsLoading = true;
+
+    try {
+      const rings = activeBasemap.hasBuildingGeometry
+        ? await this.buildings.buildingsNear(around.lng, around.lat, TUNING.walls.loadRadiusMetres)
+        : [];
+
+      this.collision.rebuild(rings, around.lng, around.lat, TUNING.walls.loadRadiusMetres);
+      this.realBuildingCount = this.collision.wallCount();
+
+      // Somewhere with almost nothing built on it: a beach, a park, open
+      // countryside, or simply an area nobody has mapped. Generate structure.
+      this.generatedCount = 0;
+      if (this.realBuildingCount < TUNING.walls.tooFewBuildingsForAFight) {
+        const cell = worldCellFor(around.lat, around.lng);
+        this.generatedCount = addFallbackArena(
+          this.collision,
+          cell.seed,
+          TUNING.walls.fallbackObstacleCount
+        );
+      }
+
+      this.wallsBuiltAt = { ...around };
+    } finally {
+      this.wallsLoading = false;
+    }
   }
 
   /* ------------------------------------------------------------------ */
@@ -174,8 +249,36 @@ export class Game {
     const input = this.joystick.read();
     const engaged = this.joystick.isEngaged();
 
+    // Remember where the character was standing before it moved, so that if it
+    // gets wedged we know which side to let it out on.
+    const cameFromLng = this.character.lng;
+    const cameFromLat = this.character.lat;
+
     // 2. Move the character, honouring the leash.
     this.character.update(deltaSeconds, this.anchor, input);
+
+    // 2b. Push the character out of any building it has walked into.
+    // Done after movement rather than by refusing the move, because sliding
+    // along a wall feels far better than sticking to it.
+    if (this.collision.wallCount() > 0) {
+      const localX = this.collision.toLocalX(this.character.lng);
+      const localY = this.collision.toLocalY(this.character.lat);
+      if (
+        this.collision.resolveCircle(
+          localX,
+          localY,
+          TUNING.walls.playerCollisionRadiusMetres,
+          this.resolved,
+          this.collision.toLocalX(cameFromLng),
+          this.collision.toLocalY(cameFromLat)
+        )
+      ) {
+        this.character.placeAt(
+          this.collision.toLng(this.resolved.x),
+          this.collision.toLat(this.resolved.y)
+        );
+      }
+    }
 
     // 3. Copy the character into the data the graphics card will read.
     if (this.playerEntity >= 0) {
@@ -213,6 +316,14 @@ export class Game {
       entitiesDrawn: this.layer.drawnLastFrame(),
       inCombat: this.camera.isInCombat(),
       zoom: this.camera.currentZoom(),
+      walls: {
+        wallCount: this.collision.wallCount(),
+        realBuildings: this.realBuildingCount,
+        generated: this.generatedCount,
+        usingFallbackArena: this.generatedCount > 0,
+        tilesFetched: this.buildings.stats.tilesFetched,
+        loading: this.wallsLoading,
+      },
       leashTension: this.character.leashTension(this.anchor),
       distanceFromAnchor: this.character.distanceFromAnchor(this.anchor),
     };

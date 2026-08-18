@@ -69,7 +69,7 @@ async function boot(): Promise<void> {
   // 4. THE GAME ------------------------------------------------------------
   // Everything that moves: the entity pool, the drawing layer welded into the
   // map, the leashed character, the joystick and the combat camera.
-  const game = new Game(mapView.map, uiContainer, startAt);
+  const game = new Game(mapView.map, uiContainer, startAt, mapView.isUsingMirror());
 
   // 5. THE INTERFACE -------------------------------------------------------
   const hud = new Hud(uiContainer, () => {

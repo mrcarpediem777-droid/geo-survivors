@@ -141,6 +141,37 @@ expected and is exactly why it only logs.
 
 ---
 
+## Walls — real buildings, and what to do without them
+
+| Number | Now | What it does |
+|---|---|---|
+| `loadRadiusMetres` | 700 | How far around you buildings are loaded. |
+| `rebuildAfterMovingMetres` | 250 | How far you must walk before walls are worked out again. |
+| `tooFewBuildingsForAFight` | 25 | Below this many real buildings, obstacles are invented instead. |
+| `fallbackObstacleCount` | 18 | How many obstacles to invent. |
+| `playerCollisionRadiusMetres` | 2.2 | How wide you are for bumping into things. |
+
+- **Monsters appear through walls at the edge of the screen** → *raise* `loadRadiusMetres`
+- **First load is slow on mobile data** → *lower* it toward 450
+- **Empty places feel like a featureless field** → *raise* `fallbackObstacleCount` toward 30
+- **You get snagged on corners** → *lower* `playerCollisionRadiusMetres` toward 1.8
+- **You slip through gaps that look too narrow** → *raise* it toward 2.6
+
+> **For scale, measured from real map data:** central London delivers about 1545 buildings
+> per km², Da Nang about 225, and an unmapped area 0. `tooFewBuildingsForAFight` at 25 is
+> counted within the 700 m load radius, so it trips only in genuinely empty places —
+> beaches, open water, countryside.
+
+> **Known rough edge:** the invented arena currently blocks only about 3% of the ground
+> around you. That is cover, but it may be too thin to fight around. Worth revisiting once
+> M4 gives us monsters to judge it against.
+
+⚠️ `playerCollisionRadiusMetres` is deliberately smaller than the drawn circle, so alleys
+that look passable are passable. If you make it larger than the drawn size, the character
+will appear to stop short of walls, which reads as broken.
+
+---
+
 ## Performance ⏳ *(mostly M6)*
 
 | Number | Now | What it does |

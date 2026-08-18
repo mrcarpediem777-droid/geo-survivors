@@ -26,6 +26,18 @@ export interface BasemapOption {
   /** The style recipe URL handed to MapLibre. */
   styleUrl: string;
   /**
+   * Direct address of one data square, with {z}/{x}/{y} standing in for which
+   * square. The game fetches these itself to work out where the walls are --
+   * see `src/world/buildingSource.ts` for why it does not just ask the map.
+   */
+  tileUrlTemplate: string;
+  /**
+   * Do this provider's squares actually contain building outlines?
+   * Measured, not assumed. When false, the game goes straight to generated
+   * obstacles instead of hunting for walls that are not there.
+   */
+  hasBuildingGeometry: boolean;
+  /**
    * The name of the layer inside the map data that holds building footprints.
    * M3 reads building shapes out of this. Both providers below use the
    * "OpenMapTiles" data layout, where that layer is simply called "building".
@@ -50,6 +62,15 @@ export interface BasemapOption {
   mirrorPath: string;
   /** Attribution we are legally required to show. */
   attribution: string;
+  /**
+   * Route this provider through our own site by default, rather than only
+   * falling back to it when the direct route fails.
+   *
+   * Worth it when the provider has no global delivery network of its own: we
+   * measured Versatiles at 1.7s a tile direct, and 0.4s through our site once
+   * it is cached at an edge near the player.
+   */
+  preferMirror: boolean;
   /** Plain-language note for the designer. */
   notes: string;
 }
@@ -63,15 +84,23 @@ export const BASEMAPS: Record<string, BasemapOption> = {
     id: 'liberty',
     label: 'OpenFreeMap Liberty (default)',
     styleUrl: 'https://tiles.openfreemap.org/styles/liberty',
+    // Note the dated portion: OpenFreeMap versions its data by build date, so
+    // this address goes stale. It does not matter, because we never read
+    // buildings from this provider -- it has almost none. See below.
+    tileUrlTemplate: 'https://tiles.openfreemap.org/planet/20260802_080001_pt/{z}/{x}/{y}.pbf',
+    hasBuildingGeometry: false,
     buildingSourceLayer: 'building',
     vectorSourceId: 'openmaptiles',
     tileOrigin: 'https://tiles.openfreemap.org',
     mirrorPath: '/maptiles',
+    preferMirror: false,
     attribution: '© OpenStreetMap contributors, © OpenFreeMap',
     notes:
-      'Free forever, no key. Good building coverage wherever OSM has it. ' +
-      'Served through Cloudflare -- measured serving from the Hong Kong edge, ' +
-      'so it is fast from Vietnam and the rest of Southeast Asia.',
+      'Fast (Cloudflare, measured serving from the Hong Kong edge) but MEASURED ' +
+      'TO BE NEARLY EMPTY OF BUILDINGS: 55 per km2 in central London and 1.4 in ' +
+      'Hoi An, against 1445 and 6900 in OpenStreetMap itself. Unusable for M3, ' +
+      'where buildings are the level design. Kept only as a fallback for when ' +
+      'the primary provider is unreachable -- a plain map beats no map.',
   },
 
   /**
@@ -81,24 +110,38 @@ export const BASEMAPS: Record<string, BasemapOption> = {
    */
   versatiles: {
     id: 'versatiles',
-    label: 'Versatiles Colorful (backup)',
+    label: 'Versatiles Colorful (default)',
     styleUrl: 'https://tiles.versatiles.org/assets/styles/colorful/style.json',
-    buildingSourceLayer: 'building',
+    tileUrlTemplate: 'https://tiles.versatiles.org/tiles/osm/{z}/{x}/{y}',
+    hasBuildingGeometry: true,
+    // NOTE THE PLURAL. Versatiles uses a different data layout ("shortbread")
+    // from OpenFreeMap, and its building layer is called `buildings`. Getting
+    // this wrong means finding zero walls and blaming the wrong thing.
+    buildingSourceLayer: 'buildings',
     vectorSourceId: 'versatiles-shortbread',
     tileOrigin: 'https://tiles.versatiles.org',
     mirrorPath: '/maptiles-backup',
+    preferMirror: true,
     attribution: '© OpenStreetMap contributors, © Versatiles',
     notes:
-      'Independent backup provider in case OpenFreeMap has an outage. ' +
-      'CAUTION: plain nginx with no global CDN, so from Asia this is likely ' +
-      'SLOWER than the default. It is a availability fallback, not a speed one.',
+      'THE PROVIDER WE ACTUALLY USE, because it is the one with the buildings. ' +
+      'Measured: 1545 per km2 in central London, 2711 in Hoi An, 225 in Da Nang, ' +
+      'with a median footprint of 76 m2 -- real houses, not just landmarks. ' +
+      'It has no global CDN and is about 5x slower direct (1.7s vs 0.33s a tile), ' +
+      'which is why we route it through our own site by default: measured 0.4s ' +
+      'a tile once Vercel has it cached.',
   },
 };
 
 /**
  * >>> CHANGE THIS ONE LINE TO SWITCH MAP PROVIDER <<<
+ *
+ * Currently Versatiles, and the reason is worth remembering: it is the one that
+ * actually contains building footprints. OpenFreeMap looks nicer and is faster,
+ * but measurement showed its tiles carry under 4% of the buildings that exist in
+ * OpenStreetMap -- and in this game the buildings ARE the level design.
  */
-export const ACTIVE_BASEMAP_ID = 'liberty';
+export const ACTIVE_BASEMAP_ID = 'versatiles';
 
 export const activeBasemap: BasemapOption = BASEMAPS[ACTIVE_BASEMAP_ID];
 

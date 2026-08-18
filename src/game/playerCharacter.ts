@@ -130,6 +130,15 @@ export class PlayerCharacter {
     }
   }
 
+  /**
+   * Move the character to an exact spot without any easing.
+   * Used by wall collision, which has already decided where it is allowed to be.
+   */
+  placeAt(lng: number, lat: number): void {
+    this.position.lng = lng;
+    this.position.lat = lat;
+  }
+
   /** How far the character currently is from your real position, in metres. */
   distanceFromAnchor(anchor: LatLng | null): number {
     if (!anchor) return 0;

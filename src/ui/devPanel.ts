@@ -105,6 +105,8 @@ export function installDevTools(
       <button id="dev-here" style="${buttonStyle()}">fake GPS here</button>
       <button id="dev-combat-zoom" style="${buttonStyle()}">combat zoom</button>
       <button id="dev-nav-zoom" style="${buttonStyle()}">nav zoom</button>
+      <button id="dev-walls" style="${buttonStyle()}">load walls here</button>
+      <button id="dev-show-walls" style="${buttonStyle()}">show/hide walls</button>
       <button id="dev-markers" style="${buttonStyle()}">test markers here</button>
       <button id="dev-stress" style="${buttonStyle()}">stress test</button>
       <button id="dev-reset-save" style="${buttonStyle()}">wipe save</button>
@@ -264,6 +266,36 @@ export function installDevTools(
     });
   });
 
+  panel.querySelector('#dev-walls')!.addEventListener('click', () => {
+    const c = mapView.map.getCenter();
+    void game.rebuildWalls({ lat: c.lat, lng: c.lng }).then(() => refreshWallOverlay(true));
+  });
+
+  panel.querySelector('#dev-show-walls')!.addEventListener('click', () => {
+    refreshWallOverlay(!mapView.hasWallOverlay());
+  });
+
+  /** Convert the collision walls back to map coordinates and draw them. */
+  function refreshWallOverlay(show: boolean): void {
+    if (!show) {
+      mapView.hideWallOverlay();
+      return;
+    }
+    const col = game.collision;
+    const rings = col.wallOutlines().map((points) => {
+      const ring: number[][] = [];
+      for (let i = 0; i < points.length; i += 2) {
+        ring.push([col.toLng(points[i]), col.toLat(points[i + 1])]);
+      }
+      // GeoJSON wants the loop closed.
+      if (ring.length && (ring[0][0] !== ring[ring.length - 1][0] || ring[0][1] !== ring[ring.length - 1][1])) {
+        ring.push([ring[0][0], ring[0][1]]);
+      }
+      return ring;
+    });
+    mapView.showWallOverlay(rings);
+  }
+
   panel.querySelector('#dev-markers')!.addEventListener('click', () => {
     const centre = mapView.map.getCenter();
     game.spawnTestMarkers({ lat: centre.lat, lng: centre.lng });
@@ -399,6 +431,9 @@ export function installDevTools(
       `screen     ${across.toFixed(0)} m across`,
       `camera     ${g.inCombat ? 'COMBAT' : 'navigation'}`,
       `entities   ${g.entitiesAlive} alive / ${g.entitiesDrawn} drawn`,
+      `walls      ${g.walls.loading ? 'loading...' : g.walls.wallCount + ' (' + g.walls.realBuildings + ' real, ' + g.walls.generated + ' generated)'}`,
+      `arena      ${g.walls.usingFallbackArena ? 'FALLBACK -- too few real buildings here' : 'real buildings'}`,
+      `tiles read ${g.walls.tilesFetched}`,
       `leash      ${g.distanceFromAnchor.toFixed(1)} m (${(g.leashTension * 100).toFixed(0)}% stretched)`,
       `source     ${state.source}`,
       `accuracy   ${Number.isFinite(state.accuracyMetres) ? state.accuracyMetres.toFixed(1) + ' m' : '--'}`,

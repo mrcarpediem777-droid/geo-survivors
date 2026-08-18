@@ -9,8 +9,8 @@ Claude: *"Read PLAYBOOK.md and tell me where we left off."*
 
 | | |
 |---|---|
-| **Milestone reached** | **M2 — things live on the map** ✅ *(M1 verified on a real phone in Da Nang)* |
-| **Next milestone** | M3 — real buildings as solid walls. **The make-or-break one.** |
+| **Milestone reached** | **M3 — real buildings are solid walls** ✅ |
+| **Next milestone** | M4 — the swarm: nests, monsters, auto-firing weapons, level-ups |
 | **Code lives at** | https://github.com/mrcarpediem777-droid/geo-survivors |
 | **Live URL** | **https://geo-survivors.vercel.app** |
 | **Vercel dashboard** | https://vercel.com/abc-70f4/geo-survivors |
@@ -128,6 +128,11 @@ at the edge of its rope, then walk with the arrow keys and watch it get dragged 
 - the **hollow blue ring** is where you really are (your smoothed GPS)
 - the **solid blue circle** is the character you steer
 - the gap between them is the leash
+
+**Walls are real now.** Try to walk your character into the building next to you — it
+will not go. Press **show/hide walls** in the dev panel to highlight in red exactly what
+the game treats as solid; those shapes should sit precisely on the buildings the map has
+drawn.
 
 **The orange dots** are test markers at fixed real-world positions, in rings 10 m, 25 m
 and 50 m out. They exist so you can check the most important thing in M2: zoom and pan
@@ -257,6 +262,68 @@ is rewritten, in one place, `transformRequest` in `src/map/mapView.ts`.
 
 ---
 
+## Buildings as level design — and the map provider problem
+
+**This nearly sank M3, and the cause was not what anyone would guess.**
+
+The game reads building outlines out of the map data. Measuring what actually arrived was
+alarming: in central London the map delivered **55 buildings per km²** where OpenStreetMap
+has about **1445**. In Hoi An it delivered **1.4** against roughly **6900**. Under 4% of
+reality, and in some places under 0.1%.
+
+The first conclusion — that Vietnam is poorly mapped — was **wrong**, and it would have
+sent you on a pointless trip to Hoi An. OpenStreetMap has the buildings. Our map provider
+simply was not shipping them.
+
+Swapping to the other provider already in the config fixed it completely:
+
+| Place | OpenFreeMap (old) | Versatiles (now) |
+|---|---|---|
+| London, Soho | 55 / km² | **1545 / km²** |
+| Hoi An | 1.4 / km² | **2711 / km²** |
+| Da Nang, Hai Chau | 1.9 / km² | **225 / km²** |
+
+Median building footprint in Da Nang: **76 m²** — real shophouses, not just landmarks.
+**M3 works in your own neighbourhood.** No trip required.
+
+The cost: the new provider has no worldwide delivery network and is about 5× slower to
+answer (1.7s a tile against 0.33s). We route it through our own address instead, which
+caches it near you — measured back down to 0.4s. That is the tile mirror from earlier,
+now earning its keep as a speed feature rather than a workaround.
+
+### The two bugs that made walls unusable
+
+**1. Every building arrived two to four times.** Map squares overlap slightly at the
+joins, so a building near an edge is delivered by both neighbouring squares, clipped
+differently in each. Two nearly-identical walls sitting on top of each other trap a
+player: pushed out of one, they land inside the other, forever. Measured: 20 of 120
+buildings trapped a character. Fixed by giving each building exactly one owner — the
+square its middle falls into. 514 duplicate copies dropped in Da Nang alone.
+
+**2. Terraced houses share walls.** Being shoved out of one shophouse puts you inside the
+next, and pushing harder just walks you along the row. Now, when a character is genuinely
+wedged, the game stops pushing and searches outward for the nearest open ground —
+preferring the side it came in from, so it never gets spat out through the far wall.
+
+**Verified after both fixes**, on 590 real Da Nang buildings:
+
+| Check | Result |
+|---|---|
+| Walking straight at a building | **203 of 203 blocked**, none walked through |
+| Dropped inside a building | **583 of 583 freed**, none stuck |
+| Line of sight through a building | **40 of 40 blocked** (this is what M4 projectiles will use) |
+| Cost per character per frame | 0.0011 ms — room for **15,000 checks a frame**, far more than the 400 monsters we need |
+
+### Where there are no buildings
+
+Open sea, countryside, a big park, or simply an unmapped neighbourhood: the game invents
+obstacles instead, so a fight still has cover and chokepoints. They come from the same
+seed as everything else in that patch of world, so **the same place always generates the
+same arena** and two players standing together see the same one. Verified: identical
+across repeated builds, and the spot you arrive at is always clear.
+
+---
+
 ## Why the game objects cannot drift off the map
 
 This is the piece the brief called make-or-break for M2, so it is worth knowing how it
@@ -319,7 +386,8 @@ mode** toggle that reduces monster counts and map redraws. Until then:
 | **Bundle is 960 kB** | Almost all of it is the map library itself (250 kB once compressed, which is fine on mobile data). Not worth optimising yet. |
 | **Desktop location is approximate** | On a computer there is no GPS chip, so the browser guesses from your internet connection. Use fake GPS for real testing. |
 | **Map mirror costs bandwidth** | See the tile mirror section above. Fine at prototype scale, needs a proper solution if the game grows in an affected region. |
-| **OSM building coverage varies** | Building shapes come from OpenStreetMap, and coverage is excellent in some places and thin in others. **This is the single biggest open question for M3** and we should check your actual neighbourhood early. |
+| **Fallback arena is sparse** | The generated obstacles cover only about 3% of the ground around you. Fine for cover, possibly too thin for a good fight — worth raising `fallbackObstacleCount` once there are monsters to judge it against. |
+| **Building data still lags reality** | Even the good provider delivers roughly what OpenStreetMap has, and OSM itself is thinner in Da Nang (225/km²) than in Europe (1545/km²). Playable, but a European street will have noticeably more structure than a Vietnamese one. |
 
 ---
 

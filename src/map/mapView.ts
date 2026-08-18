@@ -61,6 +61,11 @@ const ACCURACY_SOURCE_ID = 'gps-accuracy-source';
 const ACCURACY_FILL_ID = 'gps-accuracy-fill';
 const ACCURACY_LINE_ID = 'gps-accuracy-line';
 
+/** Dev-only overlay showing what the game treats as a wall. */
+const WALL_SOURCE_ID = 'debug-walls-source';
+const WALL_FILL_ID = 'debug-walls-fill';
+const WALL_LINE_ID = 'debug-walls-line';
+
 /** Everything we know about whether the map is actually working. */
 export interface MapDiagnostics {
   /** Does this phone support the graphics system the map needs? */
@@ -145,7 +150,10 @@ export class MapView {
    *   discovery every single time they open the game.
    */
   constructor(containerId: string, startAt: LatLng, startWithMirror = false) {
-    this.useMirror = startWithMirror;
+    // Some providers are simply slow when talked to directly, so for those we go
+    // through our own site from the outset rather than discovering it the hard
+    // way. See `preferMirror` in the basemap config for the measurements.
+    this.useMirror = startWithMirror || this.basemap.preferMirror;
 
     this.map = new MapLibreMap({
       container: containerId,
@@ -496,6 +504,57 @@ export class MapView {
 
   isFollowing(): boolean {
     return this.followPlayer;
+  }
+
+  /**
+   * Draw the outlines the game is actually using as walls, on top of the map.
+   *
+   * This is how you check M3 with your own eyes: the highlighted shapes should
+   * sit exactly on the buildings the map has drawn. If they are offset, or if a
+   * building you can see has no outline, that is the bug -- and it is much
+   * easier to spot than to reason about.
+   */
+  showWallOverlay(ringsAsLngLat: number[][][]): void {
+    const data = {
+      type: 'FeatureCollection' as const,
+      features: ringsAsLngLat.map((ring) => ({
+        type: 'Feature' as const,
+        properties: {},
+        geometry: { type: 'Polygon' as const, coordinates: [ring] },
+      })),
+    };
+
+    const existing = this.map.getSource<GeoJSONSource>(WALL_SOURCE_ID);
+    if (existing) {
+      existing.setData(data);
+      return;
+    }
+
+    this.map.addSource(WALL_SOURCE_ID, { type: 'geojson', data });
+    this.map.addLayer({
+      id: WALL_FILL_ID,
+      type: 'fill',
+      source: WALL_SOURCE_ID,
+      paint: { 'fill-color': '#f43f5e', 'fill-opacity': 0.22 },
+    });
+    this.map.addLayer({
+      id: WALL_LINE_ID,
+      type: 'line',
+      source: WALL_SOURCE_ID,
+      paint: { 'line-color': '#f43f5e', 'line-width': 1.5, 'line-opacity': 0.85 },
+    });
+  }
+
+  /** Take the wall overlay away again. */
+  hideWallOverlay(): void {
+    for (const id of [WALL_FILL_ID, WALL_LINE_ID]) {
+      if (this.map.getLayer(id)) this.map.removeLayer(id);
+    }
+    if (this.map.getSource(WALL_SOURCE_ID)) this.map.removeSource(WALL_SOURCE_ID);
+  }
+
+  hasWallOverlay(): boolean {
+    return !!this.map.getSource(WALL_SOURCE_ID);
   }
 
   /** Hand the camera over to the game loop. */
