@@ -26,6 +26,11 @@ export default defineConfig({
       },
     },
   },
+  // Bundle background workers as modern modules. MapLibre asks for its worker as
+  // a module, so it has to be built as one.
+  worker: {
+    format: 'es',
+  },
   build: {
     outDir: 'dist',
     // Warn loudly if a bundle gets fat -- this game must load fast on mobile data.

@@ -43,7 +43,7 @@ export interface ProfileData {
 }
 
 const STORAGE_KEY = 'geo-survivors.profile';
-const CURRENT_VERSION = 1;
+const CURRENT_VERSION = 2;
 
 function freshProfile(): ProfileData {
   return {
@@ -78,7 +78,19 @@ export class Profile {
       // from crashing on somebody's old data.
       if (parsed.version !== CURRENT_VERSION) {
         console.info('[profile] save file is from an older version, upgrading it');
-        return { ...freshProfile(), ...parsed, version: CURRENT_VERSION };
+        return {
+          ...freshProfile(),
+          ...parsed,
+          version: CURRENT_VERSION,
+          // Version 2 clears this deliberately. While the real cause of a blank
+          // map was being hunted, some phones got the mirror switched on because
+          // the map appeared to be unreachable. The actual fault was a missing
+          // file in our own build, now fixed -- so anyone carrying that flag
+          // should go back to talking to the map servers directly, which is
+          // faster and costs us no bandwidth. If a network genuinely does block
+          // them, it will simply be switched on again within a few seconds.
+          useTileMirror: false,
+        };
       }
 
       return { ...freshProfile(), ...parsed };

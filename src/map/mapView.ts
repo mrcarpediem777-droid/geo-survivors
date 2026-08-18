@@ -17,8 +17,33 @@
  */
 
 // MapLibre v6 has no default export -- everything is imported by name.
-import { Map as MapLibreMap, Marker, type GeoJSONSource } from 'maplibre-gl';
+import { Map as MapLibreMap, Marker, setWorkerUrl, type GeoJSONSource } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
+
+/**
+ * THE BACKGROUND WORKER -- and why this three-line block matters enormously.
+ * =========================================================================
+ * A "worker" is a second thread the browser runs alongside the page. MapLibre
+ * uses one to unpack map data without freezing the screen, and it does ALL tile
+ * decoding there. No worker means no tiles -- and, cruelly, no error either:
+ * requests go out and results simply never come back.
+ *
+ * By default MapLibre looks for its worker in a file sitting next to itself.
+ * That works when you use MapLibre straight from the internet, but our build
+ * tool bundles everything into one file with a scrambled name, so the worker
+ * file it looks for does not exist. On the live site it was a plain 404.
+ *
+ * This was invisible during development, because there the original files are
+ * still lying around where MapLibre expects them. It only broke once deployed --
+ * which is exactly the sort of bug that eats a week if you are not looking for it.
+ *
+ * `?worker&url` tells the build tool: bundle this worker AND everything it needs
+ * into one self-contained file, then give me its real address. We hand that
+ * address to MapLibre, and it stops guessing.
+ */
+import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
+
+setWorkerUrl(maplibreWorkerUrl);
 
 import {
   activeBasemap,

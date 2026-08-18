@@ -159,28 +159,46 @@ You can watch this working in the dev panel: drag the fake GPS marker a long way
 
 ---
 
-## If the map is blank: the tile mirror
+## The blank map bug, and what it taught us
 
-**A real thing that happened, and is now handled automatically.**
+**The symptom:** on a phone in Da Nang the game showed a white screen with the blue dot
+floating on it. The phone was fine, Chrome was fine, the graphics were fine, the map even
+drew a frame. Map data was requested and **never arrived, with no error of any kind**.
 
-On a mobile network in Da Nang, the game showed a white screen with the blue dot
-floating on it. The phone was fine, Chrome was fine, the graphics were fine, and the map
-even drew a frame. But requests for map data **hung forever and never returned an error**
-— and the same happened with a completely separate map provider, while our own page
-loaded instantly. That network simply does not deliver anything from the map servers.
+**The actual cause, after one wrong turn:** MapLibre does all its map-data unpacking in a
+*worker* — a second thread the browser runs alongside the page. By default it looks for
+that worker in a file sitting next to itself. Our build tool bundles everything into one
+file with a scrambled name, so **the file MapLibre went looking for did not exist.** It
+was a plain 404 on the live site.
 
-**The fix:** the game re-routes every map request through our own web address
-(`geo-survivors.vercel.app/maptiles/...`), which the same network allows without
-complaint. Vercel forwards it on. The game tries the direct route first, and only falls
-back to the mirror if nothing arrives within about 12 seconds.
+No worker means no tiles, and — cruelly — no error either. Requests go out, results never
+come back, and the map sits there looking innocent.
 
-**It only has to discover this once.** The choice is saved on the phone, so the next
-launch goes straight to the mirror with no delay.
+**Why it was invisible until deployment:** during development the original files are still
+lying around where MapLibre expects them, so it works perfectly on your computer. It only
+breaks in the built version. This is a nasty class of bug and worth remembering: *if
+something works locally and fails deployed, suspect the build, not the network.*
 
-The subtle part, in case it ever needs revisiting: the map's recipe file lists its data
-with full web addresses pointing back at the blocked servers. So mirroring just the first
-request is not enough — **every** request has to be rewritten. That happens in one place,
-`transformRequest` in `src/map/mapView.ts`.
+**The fix** is three lines at the top of `src/map/mapView.ts`: bundle the worker
+explicitly and tell MapLibre exactly where it is.
+
+> **The wrong turn, kept here on purpose.** The first diagnosis was that the network in
+> Vietnam was blocking the map servers — the evidence genuinely pointed that way, since
+> requests hung silently rather than failing. That was wrong; the tile servers were always
+> reachable. The lesson: "requests hang with no error" pointed at the network, but it was
+> equally consistent with nobody being home to receive the answer.
+
+### The tile mirror (kept, but now dormant)
+
+Built during that wrong turn, and kept because it is genuinely useful: if map data ever
+fails to arrive for 12 seconds, the game re-routes every map request through our own
+address (`/maptiles/...`) before giving up. Bad mobile signal outdoors is a real scenario
+and this is a reasonable safety net.
+
+It is **off unless needed**, and the choice is remembered so an affected player waits only
+once. One subtlety if it ever needs revisiting: the map's recipe file names its data with
+full web addresses, so mirroring only the first request is not enough — **every** request
+is rewritten, in one place, `transformRequest` in `src/map/mapView.ts`.
 
 > ⚠️ **Two files must be kept in step:** `vercel.json` (the live site) and the `proxy`
 > section of `vite.config.ts` (your computer). They set up the same mirror in the two
