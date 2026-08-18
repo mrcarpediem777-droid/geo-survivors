@@ -194,6 +194,12 @@ export const TUNING = {
     /**
      * READ THIS BEFORE CHANGING ANY SPEED.
      *
+     * HEALTH WAS DOUBLED after the shooters were removed. Without it the front
+     * rank died exactly as fast as the next rank arrived, so a siege line formed
+     * about 20 m out and never closed -- measured: eight minutes, 440 monsters
+     * alive, and the player never once took damage. Tougher monsters break that
+     * stalemate by surviving the approach.
+     *
      * Every monster speed below is in REAL metres per second, and every one is
      * under 1.4 -- the speed of a walking human. That is a safety rule from the
      * brief, not a balance choice: it guarantees you can always walk away from
@@ -213,8 +219,8 @@ export const TUNING = {
         name: 'swarmer',
         /** Fast, weak, arrives in crowds. The bread and butter. */
         speedMps: 1.3,
-        health: 10,
-        damagePerSecond: 6,
+        health: 20,
+        damagePerSecond: 10,
         radiusMetres: 1.6,
         xp: 1,
         colour: [220, 70, 70, 255],
@@ -224,8 +230,8 @@ export const TUNING = {
         name: 'brute',
         /** Slow and tough. Blocks alleys and soaks damage. */
         speedMps: 0.75,
-        health: 60,
-        damagePerSecond: 14,
+        health: 110,
+        damagePerSecond: 22,
         radiusMetres: 2.8,
         xp: 5,
         colour: [180, 60, 110, 255],
@@ -244,11 +250,35 @@ export const TUNING = {
         radiusMetres: 1.8,
         xp: 3,
         colour: [230, 140, 50, 255],
-        weight: 10,
+        /**
+         * SET TO 0 ON REQUEST: nothing shoots at the player any more.
+         *
+         * Raise this back to 10 and spitters return. Worth knowing what comes
+         * back with them: this is the only monster that makes buildings matter
+         * TACTICALLY rather than just physically. Walls still funnel the swarm
+         * without it, but ducking behind a house to break line of fire is a
+         * move that no longer exists.
+         */
+        weight: 0,
         rangeMetres: 34,
         reloadSeconds: 2.4,
         shotDamage: 9,
         shotSpeedMps: 26,
+      },
+      {
+        name: 'stalker',
+        /**
+         * The spitter's replacement. Quick and fragile, and it hurts on contact
+         * rather than at range -- so the pressure still varies, but nothing
+         * shoots at you.
+         */
+        speedMps: 1.35,
+        health: 46,
+        damagePerSecond: 17,
+        radiusMetres: 2.0,
+        xp: 3,
+        colour: [230, 140, 50, 255],
+        weight: 10,
       },
     ] as MonsterType[],
 
@@ -363,10 +393,21 @@ export const TUNING = {
   /* ---------------------------------------------------------------------- */
   player: {
     maxHealth: 100,
-    /** Health regained per second, so small mistakes are not permanent. */
-    healthRegenPerSecond: 0.8,
-    /** Seconds of protection after being hit, so a crowd cannot delete you. */
-    invulnerableAfterHitSeconds: 0.55,
+    /**
+     * Health regained per second, so small mistakes are not permanent.
+     *
+     * Lowered from 0.8. With the shooters gone, this quietly out-healed every
+     * scratch a crowd could inflict -- measured: eight minutes with 436 monsters
+     * around and health never fell below 112 of 142. Regeneration should forgive
+     * a mistake, not erase a siege.
+     */
+    healthRegenPerSecond: 0.45,
+    /**
+     * Seconds of protection after being hit, so a crowd cannot delete you.
+     * Shortened from 0.55 for the same reason: standing inside a swarm should
+     * cost something.
+     */
+    invulnerableAfterHitSeconds: 0.4,
     /** How close an experience orb must be before it flies to you. */
     pickupRadiusMetres: 14,
     /** How fast orbs fly in once they notice you. */
@@ -392,18 +433,19 @@ export const TUNING = {
   levelling: {
     /**
      * Experience needed for the first level.
-     * Raised from 5 after play-testing: levels arrived so fast that the choice
-     * stopped feeling like a choice.
+     * Raised from 5, then from 9, both times because levels arrived so fast
+     * that the choice stopped feeling like a choice.
      */
-    firstLevelXp: 9,
+    firstLevelXp: 14,
     /**
      * Each level costs this much more than the last.
      *   1.0  = every level costs the same, so they keep coming.
      *   1.35 = levels slow down noticeably, so early choices matter more.
-     * Raised from 1.28 for the same reason. Together these roughly halve how
-     * quickly levels arrive.
+     * Raised from 1.28, then from 1.36. Each level now costs 45% more than the
+     * one before, so the early picks compound and late levels are earned rather
+     * than collected.
      */
-    xpGrowthPerLevel: 1.36,
+    xpGrowthPerLevel: 1.45,
     /** How many upgrade cards to offer at each level-up. */
     cardsOffered: 3,
   },
