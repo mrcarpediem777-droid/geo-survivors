@@ -40,10 +40,13 @@ import { activeBasemap } from '../config/basemap';
 import { TUNING } from '../config/tuning';
 
 /**
- * How many things can exist at once. The brief targets 400 monsters, so this
- * leaves room for them plus projectiles, pickups and nests.
+ * How many things can exist at once.
+ *
+ * The brief targets 400 monsters; this leaves room for nearly a thousand, plus
+ * every projectile, pickup and nest. Raised because a swarm that cannot exceed
+ * the player's damage output means a standing player can never lose.
  */
-const ENTITY_CAPACITY = 1200;
+const ENTITY_CAPACITY = 2200;
 
 /** How big things are, in real metres. Placeholder sizes for M2. */
 const PLAYER_RADIUS_M = 3;
