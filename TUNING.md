@@ -289,14 +289,25 @@ than an old one. If they ever start deciding runs, shrink them.
 
 | Number | Now | What it does |
 |---|---|---|
-| `offStreetPenalty` | 2.5 | How much dearer it is for a monster to leave a road. |
+| `streetsOnly` | true | Monsters may walk **only** on roads. |
+| `offStreetPenalty` | 2.5 | Used when roads-only is off: how much dearer leaving a road is. |
 | `streetHalfWidthMetres` | 2.5 | How wide a road counts as. |
 | `countPerCell` | 12 | Nests scattered across the neighbourhood. |
 | `activateWithinMetres` | 190 | How close you must be before a nest wakes up. |
 | `hitFlashSeconds` | 0.12 | How long a monster flashes white when hit. |
 
-**Measured:** roads cover 45% of the ground, and monsters spend **69% of their walk on
-them** — so they really are choosing streets rather than cutting across yards.
+**Measured with roads-only on:** roads cover 45% of the ground and **82% of monsters are
+standing on one** at any moment. The rest are the edges of a crowd spilling onto the
+verge, which is what a crowd does.
+
+A side effect worth knowing: monsters now arrive in columns down the street rather than as
+a cloud from every side, so fewer are in weapon range at once and kill counts drop. That
+is the funnelling the whole idea was for, but it does change the balance.
+
+⚠️ **`streetsOnly` switches itself off wherever roads cover less than an eighth of the
+area** — a beach, a park, an unmapped district. Without that guard there would be nowhere
+legal to walk and the game would look dead, which this project has already shipped twice
+by accident.
 
 - **Monsters still cut across open ground** → *raise* `offStreetPenalty` toward 4
 - **Monsters take absurd detours** → *lower* it toward 1.5; at 1 roads are ignored entirely
