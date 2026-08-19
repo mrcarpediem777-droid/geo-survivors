@@ -43,6 +43,11 @@ export const SPRITES = [
   '🕳️', // 6  nest
   '🔵', // 7  you
   '✦', // 8  a shot
+  // Characters, in the order they appear in characters.ts.
+  '🌀', // 9  bladedancer
+  '🎯', // 10 sniper
+  '🛡️', // 11 bruiser
+  '🧲', // 12 collector
 ] as const;
 
 export const SpriteIndex = {

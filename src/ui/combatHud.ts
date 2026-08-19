@@ -11,6 +11,8 @@
 
 import type { UpgradeCard } from '../game/upgrades';
 import { META_UPGRADES, costToBuy, metaLevel, type MetaLevels } from '../game/metaProgress';
+import { CHARACTERS } from '../game/characters';
+import { SPRITES } from '../render/emojiAtlas';
 
 export class CombatHud {
   private root: HTMLDivElement;
@@ -400,7 +402,10 @@ ${data.distanceMetres.toFixed(0)} m`;
   showShop(
     essence: number,
     levels: MetaLevels,
+    unlockedCharacters: string[],
+    selectedCharacter: string,
     onBuy: (id: string) => void,
+    onCharacter: (id: string) => void,
     onClose: () => void
   ): void {
     this.shopScreen.innerHTML = '';
@@ -409,10 +414,68 @@ ${data.distanceMetres.toFixed(0)} m`;
     heading.innerHTML =
       '<div style="font:700 13px/1 ui-monospace,monospace;color:#c084fc;letter-spacing:0.16em">PERMANENT UPGRADES</div>' +
       '<div style="font:600 20px/1.4 system-ui,sans-serif;color:#e6edf3">' + essence + ' essence</div>' +
-      '<div style="font:400 12px/1.5 system-ui,sans-serif;color:#9fb3c8;max-width:300px;text-align:center">Earned only by clearing nests on foot. Kept forever, unlike the cards inside a run.</div>';
+      '<div style="font:400 12px/1.5 system-ui,sans-serif;color:#9fb3c8;max-width:300px;text-align:center">Found on dead monsters and by clearing nests. Kept forever, unlike the cards inside a run.</div>';
     heading.style.textAlign = 'center';
     heading.style.marginBottom = '14px';
     this.shopScreen.appendChild(heading);
+
+    // ----- characters -------------------------------------------------
+    const heroHeading = document.createElement('div');
+    heroHeading.innerHTML =
+      '<div style="font:700 12px/1 ui-monospace,monospace;color:#c084fc;letter-spacing:0.14em;margin-bottom:2px">CHARACTERS</div>' +
+      '<div style="font:400 11.5px/1.45 system-ui,sans-serif;color:#9fb3c8;max-width:300px">Each starts with a different weapon and changes which cards are worth taking. Tap one to play as it.</div>';
+    heroHeading.style.textAlign = 'center';
+    heroHeading.style.marginBottom = '10px';
+    this.shopScreen.appendChild(heroHeading);
+
+    for (const hero of CHARACTERS) {
+      const owned = unlockedCharacters.includes(hero.id);
+      const chosen = hero.id === selectedCharacter;
+      const affordable = owned || essence >= hero.cost;
+
+      const button = document.createElement('button');
+      Object.assign(button.style, {
+        width: 'min(340px, 88vw)',
+        marginBottom: '8px',
+        padding: '11px 14px',
+        borderRadius: '11px',
+        border: chosen ? '1px solid rgba(192,132,252,0.9)' : '1px solid rgba(255,255,255,0.14)',
+        background: chosen
+          ? 'rgba(192,132,252,0.2)'
+          : affordable
+            ? 'rgba(255,255,255,0.07)'
+            : 'rgba(255,255,255,0.04)',
+        color: affordable ? '#e6edf3' : '#7d8fa1',
+        textAlign: 'left',
+        cursor: affordable ? 'pointer' : 'default',
+        display: 'flex',
+        gap: '12px',
+        alignItems: 'center',
+      } satisfies Partial<CSSStyleDeclaration>);
+
+      const badge = owned ? (chosen ? 'PLAYING' : 'tap to use') : String(hero.cost);
+      button.innerHTML =
+        '<span style="font-size:22px;width:28px;text-align:center">' + SPRITES[hero.sprite] + '</span>' +
+        '<span style="flex:1">' +
+        '<span style="display:block;font:700 13px system-ui,sans-serif">' + hero.name + '</span>' +
+        '<span style="display:block;font:400 11.5px/1.35 system-ui,sans-serif;color:#9fb3c8">' + hero.description + '</span>' +
+        '</span>' +
+        '<span style="font:700 12px ui-monospace,monospace;color:' +
+        (chosen ? '#c084fc' : affordable ? '#e6edf3' : '#5b6b7d') + '">' + badge + '</span>';
+
+      if (affordable && !chosen) {
+        button.addEventListener('click', () => onCharacter(hero.id));
+      }
+      this.shopScreen.appendChild(button);
+    }
+
+    // ----- permanent upgrades -----------------------------------------
+    const upgradeHeading = document.createElement('div');
+    upgradeHeading.innerHTML =
+      '<div style="font:700 12px/1 ui-monospace,monospace;color:#c084fc;letter-spacing:0.14em">UPGRADES</div>';
+    upgradeHeading.style.textAlign = 'center';
+    upgradeHeading.style.margin = '14px 0 10px';
+    this.shopScreen.appendChild(upgradeHeading);
 
     for (const upgrade of META_UPGRADES) {
       const owned = metaLevel(levels, upgrade.id);

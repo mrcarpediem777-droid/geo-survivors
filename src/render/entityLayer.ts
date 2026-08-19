@@ -190,6 +190,9 @@ export class EntityLayer implements CustomLayerInterface {
 
   private lastDrawnCount = 0;
 
+  /** Which emoji the player wears. Set from the chosen character. */
+  playerSprite: number = SpriteIndex.PLAYER;
+
   constructor(store: EntityStore) {
     this.store = store;
     this.instanceData = new Float32Array(store.capacity * FLOATS_PER_INSTANCE);
@@ -426,7 +429,9 @@ export class EntityLayer implements CustomLayerInterface {
       data[offset + 4] =
         kind === EntityKind.MONSTER
           ? Math.min(store.variant[id], MONSTER_SPRITE_COUNT - 1)
-          : (SPRITE_FOR_KIND[kind] ?? SpriteIndex.SWARMER);
+          : kind === EntityKind.PLAYER
+            ? this.playerSprite
+            : (SPRITE_FOR_KIND[kind] ?? SpriteIndex.SWARMER);
       data[offset + 5] = Math.min(1, store.hitFlash[id] * 8);
 
       written++;
