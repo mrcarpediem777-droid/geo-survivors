@@ -107,6 +107,17 @@ export class FlowField {
   /** How much dearer a step is when it leaves the road. */
   private offStreetPenalty = 1;
 
+  /**
+   * When true, monsters route ALONG roads only and treat everything else as
+   * impassable -- which is what "keep them on the pavements" means.
+   *
+   * Switched off automatically wherever roads are too sparse to route on, so a
+   * beach, a park or an unmapped neighbourhood still works. Without that guard
+   * this would silently make the whole area unreachable and the game would look
+   * broken again, which is a mistake this project has already made twice.
+   */
+  private streetsOnly = false;
+
   /** The eight neighbour costs with the penalty already applied and rounded. */
   private offStreetCost = new Int32Array([
     STRAIGHT_COST, STRAIGHT_COST, STRAIGHT_COST, STRAIGHT_COST,
@@ -140,7 +151,7 @@ export class FlowField {
   private lastBuildMs = 0;
 
   /* Statistics for the dev readout. */
-  stats = { walkableCells: 0, blockedCells: 0, streetCells: 0, lastBuildMs: 0, lastRasteriseMs: 0 };
+  stats = { walkableCells: 0, blockedCells: 0, streetCells: 0, streetsOnly: false, lastBuildMs: 0, lastRasteriseMs: 0 };
 
   /* ------------------------------------------------------------------ */
   /* Step 1: work out where the buildings are. Once per area.            */
@@ -192,7 +203,8 @@ export class FlowField {
     originLat: number,
     metresPerLng: number,
     halfWidthMetres: number,
-    penalty: number
+    penalty: number,
+    strict: boolean
   ): void {
     this.offStreetPenalty = Math.min(penalty, MAX_STEP_PENALTY);
     for (let n = 0; n < 8; n++) {
@@ -238,6 +250,12 @@ export class FlowField {
     }
 
     this.stats.streetCells = painted;
+
+    // Only worth insisting on roads if there are enough of them to get anywhere.
+    const walkable = SIZE * SIZE - this.stats.blockedCells;
+    this.streetsOnly = strict && painted > walkable * 0.12;
+    this.stats.streetsOnly = this.streetsOnly;
+
     this.hasField = false;
   }
 
@@ -265,7 +283,14 @@ export class FlowField {
     // flat, the flood starts in a sealed room, nothing outside it is reachable,
     // so no nest can be placed and the game appears completely dead. Nothing on
     // screen explains why, because from the code's point of view nothing failed.
-    if (this.blocked[startCy * SIZE + startCx]) {
+    // Standing indoors, or -- with roads-only routing -- standing in a garden,
+    // means the flood has nowhere to begin. Start it at the nearest place
+    // monsters are allowed to be instead.
+    const startUsable =
+      !this.blocked[startCy * SIZE + startCx] &&
+      (!this.streetsOnly || this.onStreet[startCy * SIZE + startCx] === 1);
+
+    if (!startUsable) {
       const escaped = this.nearestOpenCell(startCx, startCy);
       if (!escaped) return false;
       startCx = escaped.cx;
@@ -322,6 +347,9 @@ export class FlowField {
 
             const neighbourIndex = ny * SIZE + nx;
             if (this.blocked[neighbourIndex]) continue;
+            // Keeping to the pavements: everything else is a wall as far as
+            // routing is concerned.
+            if (this.streetsOnly && !this.onStreet[neighbourIndex]) continue;
 
             // Do not let monsters cut a corner diagonally through the gap
             // between two buildings that touch at their corners.
@@ -367,7 +395,10 @@ export class FlowField {
           const nx = cx + dx;
           const ny = cy + dy;
           if (nx < 1 || ny < 1 || nx >= SIZE - 1 || ny >= SIZE - 1) continue;
-          if (!this.blocked[ny * SIZE + nx]) return { cx: nx, cy: ny };
+          const index = ny * SIZE + nx;
+          if (this.blocked[index]) continue;
+          if (this.streetsOnly && !this.onStreet[index]) continue;
+          return { cx: nx, cy: ny };
         }
       }
     }
@@ -496,6 +527,11 @@ export class FlowField {
   /** Can something standing here reach the player at all? */
   isReachable(worldX: number, worldY: number): boolean {
     return Number.isFinite(this.walkingDistanceMetres(worldX, worldY));
+  }
+
+  /** Are there enough roads here to insist monsters use them? */
+  streetsAreUsable(): boolean {
+    return this.streetsOnly;
   }
 
   /** Is this spot on a road? For checking the routing actually works. */

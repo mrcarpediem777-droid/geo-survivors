@@ -483,13 +483,20 @@ export class Combat {
     }
 
     // Appear just outside the nest, never inside a wall.
-    const angle = this.random() * Math.PI * 2;
-    const distance = TUNING.nests.radiusMetres + 1 + this.random() * 4;
-    const x = nest.x + Math.cos(angle) * distance;
-    const y = nest.y + Math.sin(angle) * distance;
-    if (!this.collision.hasClearance(x, y, 1.5)) return;
-
-    this.spawnMonsterAt(variant, x, y);
+    // Appear on a road if we are keeping to the roads, so a monster does not
+    // begin its life in somebody's garden with nowhere legal to walk.
+    for (let attempt = 0; attempt < 8; attempt++) {
+      const angle = this.random() * Math.PI * 2;
+      const distance = TUNING.nests.radiusMetres + 1 + this.random() * (4 + attempt * 3);
+      const x = nest.x + Math.cos(angle) * distance;
+      const y = nest.y + Math.sin(angle) * distance;
+      if (!this.collision.hasClearance(x, y, 1.5)) continue;
+      if (TUNING.navigation.streetsOnly && this.flowField.streetsAreUsable() && !this.flowField.isOnStreetAt(x, y)) {
+        continue;
+      }
+      this.spawnMonsterAt(variant, x, y);
+      return;
+    }
   }
 
   /** Create one monster of a given kind at an exact spot. */
@@ -1043,7 +1050,16 @@ export class Combat {
     if (dropXp) {
       this.monstersKilled++;
 
-      const orb = this.entities.spawn(EntityKind.XP_ORB, store.lng[id], store.lat[id], 1.3);
+      // Drop it somewhere reachable. A monster killed against a wall used to
+      // leave its reward INSIDE the building, where nobody can ever walk, and
+      // it simply sat there until it rotted.
+      const deathX = this.collision.toLocalX(store.lng[id]);
+      const deathY = this.collision.toLocalY(store.lat[id]);
+      this.collision.resolveCircle(deathX, deathY, 1.6, this.resolved, deathX, deathY);
+      const dropLng = this.collision.toLng(this.resolved.x);
+      const dropLat = this.collision.toLat(this.resolved.y);
+
+      const orb = this.entities.spawn(EntityKind.XP_ORB, dropLng, dropLat, 1.3);
       if (orb >= 0) {
         this.entities.value[orb] = store.value[id];
         this.entities.lifetime[orb] = TUNING.player.lootLifetimeSeconds;
@@ -1051,7 +1067,7 @@ export class Combat {
 
       // Money is rarer than experience, and buys things that outlast the run.
       if (this.random() < TUNING.player.coinDropChance) {
-        const coin = this.entities.spawn(EntityKind.COIN, store.lng[id], store.lat[id], 1.3);
+        const coin = this.entities.spawn(EntityKind.COIN, dropLng, dropLat, 1.3);
         if (coin >= 0) {
           this.entities.value[coin] = TUNING.player.coinValue;
           this.entities.lifetime[coin] = TUNING.player.lootLifetimeSeconds;
@@ -1116,7 +1132,17 @@ export class Combat {
       // levels at all. Without the rope you are free to walk anywhere, so
       // collecting is once again something you do rather than something that
       // happens to you -- which is how the game this borrows from works.
+      // Within reach it hops to you over the last couple of metres, rather than
+      // needing to be walked over exactly. You still have to come and get it --
+      // the sweep is the same width -- but nothing is missed by half a stride,
+      // and a coin resting against a kerb is no longer lost.
       if (distance < pickupRadius) {
+        if (distance > 1.5) {
+          const pull = TUNING.player.finalSnapSpeedMps * deltaSeconds;
+          store.lng[id] = this.collision.toLng(x + (dx / distance) * pull);
+          store.lat[id] = this.collision.toLat(y + (dy / distance) * pull);
+          continue;
+        }
         if (kind === EntityKind.COIN) this.coinsCollected += store.value[id];
         else this.gainXp(store.value[id]);
         store.release(id);

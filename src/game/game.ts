@@ -409,7 +409,8 @@ export class Game {
         around.lat,
         111320 * Math.cos((around.lat * Math.PI) / 180),
         TUNING.navigation.streetHalfWidthMetres,
-        TUNING.navigation.offStreetPenalty
+        TUNING.navigation.offStreetPenalty,
+        TUNING.navigation.streetsOnly
       );
       this.flowField.update(0, 0, performance.now());
 

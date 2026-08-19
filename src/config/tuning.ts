@@ -495,6 +495,16 @@ export const TUNING = {
      *   LARGER  = closer to the old behaviour where everything came to you.
      */
     pickupRadiusMetres: 11,
+    /**
+     * How fast loot hops the last couple of metres into your hand, once you are
+     * already close enough to have earned it.
+     *
+     * This is not the old magnetism: the distance at which loot notices you is
+     * still `pickupRadiusMetres`, and you still have to walk there. It only
+     * removes the frustration of missing something by half a stride, or of a
+     * coin resting just the wrong side of a kerb.
+     */
+    finalSnapSpeedMps: 26,
     /** How long loot lies on the ground before fading, in seconds. */
     lootLifetimeSeconds: 120,
     /** Chance that a dead monster leaves money as well as experience. */
@@ -577,6 +587,18 @@ export const TUNING = {
      *   10  = they will walk absurdly far rather than cross a car park.
      */
     offStreetPenalty: 2.5,
+    /**
+     * Keep monsters ON the roads rather than merely preferring them.
+     *
+     * With this on, anything that is not a road is a wall as far as monsters
+     * are concerned, so a swarm arrives down the street and around the corner
+     * rather than across the neighbours' yards.
+     *
+     * It switches itself off wherever roads cover less than an eighth of the
+     * area -- a beach, a park, an unmapped district -- because otherwise there
+     * would be nowhere for anything to walk and the game would look dead.
+     */
+    streetsOnly: true,
     /**
      * How wide a road counts as, either side of its centre line, in metres.
      *
