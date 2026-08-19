@@ -30,12 +30,20 @@
  */
 
 import type { CollisionWorld } from './collision';
+import type { StreetLine } from './buildingSource';
 
-/** How big each square of the field is, in metres. Smaller = finer routes, more work. */
-const CELL_METRES = 3;
+/**
+ * How big each square of the field is, in metres.
+ *
+ * Coarsened from 3 m. Preferring roads made every route cost several times more
+ * to work out -- the flood went from 4 ms to 19 ms, which at four rebuilds a
+ * second is a dropped frame four times a second. Fewer, larger squares cost
+ * proportionally less, and 4 m is still finer than any alley worth routing down.
+ */
+const CELL_METRES = 4;
 
 /** How far the field reaches from its centre, in metres. */
-const FIELD_RADIUS_METRES = 300;
+const FIELD_RADIUS_METRES = 260;
 
 /** Squares across the whole field. */
 const SIZE = Math.ceil((FIELD_RADIUS_METRES * 2) / CELL_METRES);
@@ -45,6 +53,20 @@ const SIZE = Math.ceil((FIELD_RADIUS_METRES * 2) / CELL_METRES);
 const STRAIGHT_COST = 10;
 const DIAGONAL_COST = 14;
 const UNREACHABLE = 0x7fffffff;
+
+/**
+ * The dearest a single step can ever be, which sets the size of the bucket ring.
+ *
+ * THIS CAUGHT ME OUT. The ring works because a square's neighbours always land
+ * within one lap of it, so a handful of buckets reused over and over keeps
+ * everything in order without sorting. Adding an off-road penalty multiplied
+ * step costs by 3.5, so neighbours could land 49 buckets ahead of a 15-bucket
+ * ring -- entries wrapped around, were processed out of order, and whole
+ * districts came out unreachable. The ring must be at least as long as the
+ * dearest possible step.
+ */
+const MAX_STEP_PENALTY = 8;
+const BUCKET_COUNT = DIAGONAL_COST * MAX_STEP_PENALTY + 1;
 
 /**
  * Neighbour offsets: four sides, then four corners.
@@ -72,6 +94,25 @@ export class FlowField {
   /** 1 where a building stands. Worked out once per area, not per update. */
   private blocked = new Uint8Array(SIZE * SIZE);
 
+  /**
+   * 1 where there is a road.
+   *
+   * Walking off-road is made deliberately expensive, so the shortest route is
+   * almost always along a street. Without this, monsters take the geometric
+   * short cut across yards and car parks -- technically correct, and completely
+   * wrong for a game whose whole idea is that your streets are the corridors.
+   */
+  private onStreet = new Uint8Array(SIZE * SIZE);
+
+  /** How much dearer a step is when it leaves the road. */
+  private offStreetPenalty = 1;
+
+  /** The eight neighbour costs with the penalty already applied and rounded. */
+  private offStreetCost = new Int32Array([
+    STRAIGHT_COST, STRAIGHT_COST, STRAIGHT_COST, STRAIGHT_COST,
+    DIAGONAL_COST, DIAGONAL_COST, DIAGONAL_COST, DIAGONAL_COST,
+  ]);
+
   /** Shortest walkable distance to the player, per square. */
   private distance = new Int32Array(SIZE * SIZE);
 
@@ -83,14 +124,23 @@ export class FlowField {
    * `queueHead` is the first square in each bucket, and `queueNext` chains the
    * rest -- a linked list held in a flat array, so nothing is allocated while
    * the game is running. */
-  private queueHead = new Int32Array(DIAGONAL_COST + 1).fill(-1);
+  private queueHead = new Int32Array(BUCKET_COUNT).fill(-1);
+  /**
+   * How many squares are waiting, so "is anything left?" is a comparison rather
+   * than a scan.
+   *
+   * With the off-road penalty the costs climb far higher, so the flood walks
+   * through thousands of mostly-empty buckets -- and scanning all 113 of them
+   * each time cost 18 ms, more than a whole frame. Counting is free.
+   */
+  private queuedCount = 0;
   private queueNext = new Int32Array(SIZE * SIZE);
 
   private hasField = false;
   private lastBuildMs = 0;
 
   /* Statistics for the dev readout. */
-  stats = { walkableCells: 0, blockedCells: 0, lastBuildMs: 0, lastRasteriseMs: 0 };
+  stats = { walkableCells: 0, blockedCells: 0, streetCells: 0, lastBuildMs: 0, lastRasteriseMs: 0 };
 
   /* ------------------------------------------------------------------ */
   /* Step 1: work out where the buildings are. Once per area.            */
@@ -122,9 +172,72 @@ export class FlowField {
       }
     }
 
+    this.onStreet.fill(0);
     this.stats.blockedCells = blockedCount;
     this.stats.walkableCells = SIZE * SIZE - blockedCount;
     this.stats.lastRasteriseMs = performance.now() - started;
+    this.hasField = false;
+  }
+
+  /**
+   * Paint the roads onto the grid, so the flood can be told to follow them.
+   *
+   * Roads arrive as thin lines; a real street is several metres wide and a
+   * monster should be able to use any part of it, so each segment is stamped
+   * with some width. Done once per area alongside the buildings.
+   */
+  rasteriseStreets(
+    streets: StreetLine[],
+    originLng: number,
+    originLat: number,
+    metresPerLng: number,
+    halfWidthMetres: number,
+    penalty: number
+  ): void {
+    this.offStreetPenalty = Math.min(penalty, MAX_STEP_PENALTY);
+    for (let n = 0; n < 8; n++) {
+      this.offStreetCost[n] = Math.round(NEIGHBOUR_COST[n] * this.offStreetPenalty);
+    }
+    let painted = 0;
+
+    const stampRadius = Math.max(1, Math.round(halfWidthMetres / CELL_METRES));
+
+    for (const street of streets) {
+      const points = street.coords;
+      for (let i = 0; i + 3 < points.length; i += 2) {
+        const ax = (points[i] - originLng) * metresPerLng;
+        const ay = (points[i + 1] - originLat) * 111320;
+        const bx = (points[i + 2] - originLng) * metresPerLng;
+        const by = (points[i + 3] - originLat) * 111320;
+
+        // Walk the segment in steps of about one square.
+        const length = Math.hypot(bx - ax, by - ay);
+        const steps = Math.max(1, Math.ceil(length / CELL_METRES));
+
+        for (let s = 0; s <= steps; s++) {
+          const t = s / steps;
+          const px = ax + (bx - ax) * t;
+          const py = ay + (by - ay) * t;
+          const cx = this.worldToCellX(px);
+          const cy = this.worldToCellY(py);
+          if (cx < 0 || cy < 0 || cx >= SIZE || cy >= SIZE) continue;
+
+          for (let ox = -stampRadius; ox <= stampRadius; ox++) {
+            for (let oy = -stampRadius; oy <= stampRadius; oy++) {
+              const nx = cx + ox;
+              const ny = cy + oy;
+              if (nx < 0 || ny < 0 || nx >= SIZE || ny >= SIZE) continue;
+              const index = ny * SIZE + nx;
+              if (this.blocked[index]) continue;
+              if (!this.onStreet[index]) painted++;
+              this.onStreet[index] = 1;
+            }
+          }
+        }
+      }
+    }
+
+    this.stats.streetCells = painted;
     this.hasField = false;
   }
 
@@ -161,6 +274,7 @@ export class FlowField {
 
     this.distance.fill(UNREACHABLE);
     this.queueHead.fill(-1);
+    this.queuedCount = 0;
 
     const startIndex = startCy * SIZE + startCx;
     this.distance[startIndex] = 0;
@@ -175,7 +289,7 @@ export class FlowField {
     const maxCost = UNREACHABLE;
 
     while (currentCost < maxCost) {
-      const bucket = currentCost % (DIAGONAL_COST + 1);
+      const bucket = currentCost % BUCKET_COUNT;
       let index = this.queueHead[bucket];
 
       if (index === -1) {
@@ -190,6 +304,7 @@ export class FlowField {
 
       while (index !== -1) {
         const next = this.queueNext[index];
+        this.queuedCount--;
         const cost = this.distance[index];
 
         // A square can be queued more than once; only the cheapest visit counts.
@@ -214,7 +329,13 @@ export class FlowField {
               if (this.blocked[cy * SIZE + nx] && this.blocked[ny * SIZE + cx]) continue;
             }
 
-            const newCost = cost + NEIGHBOUR_COST[n];
+            // Leaving the road is dearer, so the cheapest route -- and
+            // therefore the arrows -- hug the streets.
+            // Rounded to a whole number: the bucket ring only works on integers.
+            const stepCost = this.onStreet[neighbourIndex]
+              ? NEIGHBOUR_COST[n]
+              : this.offStreetCost[n];
+            const newCost = cost + stepCost;
             if (newCost < this.distance[neighbourIndex]) {
               this.distance[neighbourIndex] = newCost;
               this.pushToBucket(neighbourIndex, newCost);
@@ -254,14 +375,14 @@ export class FlowField {
   }
 
   private bucketsEmpty(): boolean {
-    for (let i = 0; i <= DIAGONAL_COST; i++) if (this.queueHead[i] !== -1) return false;
-    return true;
+    return this.queuedCount === 0;
   }
 
   private pushToBucket(index: number, cost: number): void {
-    const bucket = cost % (DIAGONAL_COST + 1);
+    const bucket = cost % BUCKET_COUNT;
     this.queueNext[index] = this.queueHead[bucket];
     this.queueHead[bucket] = index;
+    this.queuedCount++;
   }
 
   /** Turn the distance numbers into a direction for every square. */
@@ -375,6 +496,14 @@ export class FlowField {
   /** Can something standing here reach the player at all? */
   isReachable(worldX: number, worldY: number): boolean {
     return Number.isFinite(this.walkingDistanceMetres(worldX, worldY));
+  }
+
+  /** Is this spot on a road? For checking the routing actually works. */
+  isOnStreetAt(worldX: number, worldY: number): boolean {
+    const cx = this.worldToCellX(worldX);
+    const cy = this.worldToCellY(worldY);
+    if (cx < 0 || cy < 0 || cx >= SIZE || cy >= SIZE) return false;
+    return this.onStreet[cy * SIZE + cx] === 1;
   }
 
   /** Is a spot inside a building, according to the field's own copy? */

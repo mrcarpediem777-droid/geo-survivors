@@ -38,6 +38,15 @@ export interface BasemapOption {
    */
   waterSourceLayer: string;
   /**
+   * The layer holding roads and paths.
+   *
+   * Not an obstacle -- the opposite. Monsters are made to PREFER these, so a
+   * swarm pours down a road and funnels through a junction instead of drifting
+   * across back gardens in a straight line. This is what turns "buildings are
+   * solid" into "streets are corridors".
+   */
+  streetSourceLayer: string;
+  /**
    * Do this provider's squares actually contain building outlines?
    * Measured, not assumed. When false, the game goes straight to generated
    * obstacles instead of hunting for walls that are not there.
@@ -97,6 +106,7 @@ export const BASEMAPS: Record<string, BasemapOption> = {
     hasBuildingGeometry: false,
     buildingSourceLayer: 'building',
     waterSourceLayer: 'water',
+    streetSourceLayer: 'transportation',
     vectorSourceId: 'openmaptiles',
     tileOrigin: 'https://tiles.openfreemap.org',
     mirrorPath: '/maptiles',
@@ -126,6 +136,7 @@ export const BASEMAPS: Record<string, BasemapOption> = {
     // this wrong means finding zero walls and blaming the wrong thing.
     buildingSourceLayer: 'buildings',
     waterSourceLayer: 'water_polygons',
+    streetSourceLayer: 'streets',
     vectorSourceId: 'versatiles-shortbread',
     tileOrigin: 'https://tiles.versatiles.org',
     mirrorPath: '/maptiles-backup',
