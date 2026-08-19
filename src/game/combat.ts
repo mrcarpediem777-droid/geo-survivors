@@ -181,23 +181,35 @@ export class Combat {
    */
   private seedOpeningWave(): void {
     const roll = this.random;
+
     for (let i = 0; i < TUNING.nests.openingWaveCount; i++) {
-      // Spread them around, favouring the directions the nests are in so it
-      // still reads as "they came from there".
-      const fromNest = this.nests.length
-        ? this.nests[i % this.nests.length]
-        : { x: 1, y: 0 };
-      const nestAngle = Math.atan2(fromNest.y, fromNest.x);
-      const angle = nestAngle + (roll() - 0.5) * 1.5;
-      const distance =
-        TUNING.nests.openingWaveMinMetres +
-        roll() * (TUNING.nests.openingWaveMaxMetres - TUNING.nests.openingWaveMinMetres);
+      // Try several spots for each one. With monsters confined to roads, a
+      // single attempt failed most of the time -- twelve were asked for and
+      // three appeared, leaving a lull until the nests could walk some over.
+      for (let attempt = 0; attempt < 14; attempt++) {
+        const fromNest = this.nests.length ? this.nests[i % this.nests.length] : { x: 1, y: 0 };
+        const nestAngle = Math.atan2(fromNest.y, fromNest.x);
+        // Spread wider with each failed attempt rather than retrying the same
+        // narrow arc.
+        const angle = nestAngle + (roll() - 0.5) * (1.5 + attempt * 0.35);
+        const distance =
+          TUNING.nests.openingWaveMinMetres +
+          roll() * (TUNING.nests.openingWaveMaxMetres - TUNING.nests.openingWaveMinMetres);
 
-      const x = Math.cos(angle) * distance;
-      const y = Math.sin(angle) * distance;
-      if (this.collision.isInsideWall(x, y)) continue;
+        const x = Math.cos(angle) * distance;
+        const y = Math.sin(angle) * distance;
+        if (!this.collision.hasClearance(x, y, 1.5)) continue;
+        if (
+          TUNING.navigation.streetsOnly &&
+          this.flowField.streetsAreUsable() &&
+          !this.flowField.isOnStreetAt(x, y)
+        ) {
+          continue;
+        }
 
-      this.spawnMonsterAt(0, x, y);
+        this.spawnMonsterAt(0, x, y);
+        break;
+      }
     }
   }
 
@@ -490,13 +502,27 @@ export class Combat {
     }
 
     // Appear just outside the nest, never inside a wall.
+    // Early in a run, send them out already partway here -- otherwise the first
+    // proper wave is a minute of walking away and the street is empty.
+    const warmingUp =
+      this.runTimeSeconds < TUNING.nests.warmupSeconds &&
+      this.random() < TUNING.nests.warmupShare;
+
     // Appear on a road if we are keeping to the roads, so a monster does not
     // begin its life in somebody's garden with nowhere legal to walk.
-    for (let attempt = 0; attempt < 8; attempt++) {
-      const angle = this.random() * Math.PI * 2;
-      const distance = TUNING.nests.radiusMetres + 1 + this.random() * (4 + attempt * 3);
-      const x = nest.x + Math.cos(angle) * distance;
-      const y = nest.y + Math.sin(angle) * distance;
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const angle = warmingUp
+        ? Math.atan2(nest.y - this.anchorY, nest.x - this.anchorX) +
+          (this.random() - 0.5) * (1.6 + attempt * 0.3)
+        : this.random() * Math.PI * 2;
+
+      const distance = warmingUp
+        ? TUNING.nests.warmupMinMetres +
+          this.random() * (TUNING.nests.warmupMaxMetres - TUNING.nests.warmupMinMetres)
+        : TUNING.nests.radiusMetres + 1 + this.random() * (4 + attempt * 3);
+
+      const x = warmingUp ? this.anchorX + Math.cos(angle) * distance : nest.x + Math.cos(angle) * distance;
+      const y = warmingUp ? this.anchorY + Math.sin(angle) * distance : nest.y + Math.sin(angle) * distance;
       if (!this.collision.hasClearance(x, y, 1.5)) continue;
       if (TUNING.navigation.streetsOnly && this.flowField.streetsAreUsable() && !this.flowField.isOnStreetAt(x, y)) {
         continue;
