@@ -110,7 +110,15 @@ function tileUrl(x: number, y: number, zoom: number, useMirror: boolean): string
   return activeBasemap.mirrorPath + direct.slice(activeBasemap.tileOrigin.length);
 }
 
+/** One stretch of road, as a run of longitude/latitude points. */
+export interface StreetLine {
+  coords: Float64Array;
+}
+
 export class BuildingSource {
+  /** Roads, kept apart from obstacles because they are the opposite of one. */
+  private streetCache = new Map<string, StreetLine[]>();
+
   /** Tiles we have already fetched, so we never ask twice. */
   private cache = new Map<string, BuildingRing[]>();
 
@@ -214,7 +222,36 @@ export class BuildingSource {
     const bounds = tileBounds(x, y, zoom);
 
     const rings: BuildingRing[] = [];
+    const streets: StreetLine[] = [];
     let droppedAsDuplicate = 0;
+
+    // Roads first. They are lines rather than shapes, and they make monsters
+    // walk where people walk.
+    const streetLayer = tile.layers[activeBasemap.streetSourceLayer];
+    if (streetLayer) {
+      for (let i = 0; i < streetLayer.length; i++) {
+        const feature = streetLayer.feature(i).toGeoJSON(x, y, zoom);
+        const geometry = feature.geometry;
+        const lines =
+          geometry.type === 'LineString'
+            ? [geometry.coordinates]
+            : geometry.type === 'MultiLineString'
+              ? geometry.coordinates
+              : [];
+
+        for (const line of lines) {
+          if (!line || line.length < 2) continue;
+          const coords = new Float64Array(line.length * 2);
+          for (let k = 0; k < line.length; k++) {
+            const point = line[k] as [number, number];
+            coords[k * 2] = point[0];
+            coords[k * 2 + 1] = point[1];
+          }
+          streets.push({ coords });
+        }
+      }
+    }
+    this.streetCache.set(`${zoom}/${x}/${y}`, streets);
 
     // Buildings and water both stop things moving, so they are read the same way
     // and only differ by the label we attach.
@@ -290,6 +327,22 @@ export class BuildingSource {
     this.stats.buildingsParsed += rings.length;
     this.stats.duplicatesDropped += droppedAsDuplicate;
     return rings;
+  }
+
+  /** Every road near a point, for the pathfinding to prefer. */
+  streetsNear(lng: number, lat: number, radiusMetres: number): StreetLine[] {
+    const zoom = BUILDING_TILE_ZOOM;
+    const centre = tileForLngLat(lng, lat, zoom);
+    const reach = Math.max(1, Math.ceil(radiusMetres / tileWidthMetres(lat, zoom)));
+
+    const out: StreetLine[] = [];
+    for (let dx = -reach; dx <= reach; dx++) {
+      for (let dy = -reach; dy <= reach; dy++) {
+        const found = this.streetCache.get(`${zoom}/${centre.x + dx}/${centre.y + dy}`);
+        if (found) out.push(...found);
+      }
+    }
+    return out;
   }
 
   /** How many tiles we are holding on to. Dev readout only. */

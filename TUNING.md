@@ -285,6 +285,31 @@ than an old one. If they ever start deciding runs, shrink them.
 
 ---
 
+## Streets, and how many nests
+
+| Number | Now | What it does |
+|---|---|---|
+| `offStreetPenalty` | 2.5 | How much dearer it is for a monster to leave a road. |
+| `streetHalfWidthMetres` | 2.5 | How wide a road counts as. |
+| `countPerCell` | 12 | Nests scattered across the neighbourhood. |
+| `activateWithinMetres` | 190 | How close you must be before a nest wakes up. |
+| `hitFlashSeconds` | 0.12 | How long a monster flashes white when hit. |
+
+**Measured:** roads cover 45% of the ground, and monsters spend **69% of their walk on
+them** — so they really are choosing streets rather than cutting across yards.
+
+- **Monsters still cut across open ground** → *raise* `offStreetPenalty` toward 4
+- **Monsters take absurd detours** → *lower* it toward 1.5; at 1 roads are ignored entirely
+- **Roads feel too wide, everything counts as a street** → *lower* `streetHalfWidthMetres`
+- **The neighbourhood feels empty** → *raise* `countPerCell`, or `activateWithinMetres`
+- **Too many swarms at once** → *lower* `activateWithinMetres` toward 120
+
+⚠️ **`offStreetPenalty` is capped at 8 in the code**, and for a real reason: the routing
+sorts squares into a ring of buckets, and a step dearer than the ring is long gets
+processed out of order. Going past the cap silently made whole districts unreachable.
+
+---
+
 ## Performance ⏳ *(mostly M6)*
 
 | Number | Now | What it does |

@@ -39,6 +39,8 @@ export interface Nest {
   seed: number;
   /** How much of the way through destroying it we are, 0 to 1. */
   captureProgress: number;
+  /** Sleeping nests are scenery: no monsters, no ageing. */
+  awake: boolean;
   /** True while the player is standing close enough to be clearing it. */
   beingCaptured: boolean;
 }
@@ -163,6 +165,7 @@ export class Combat {
         seed: worldSeed + i * 7919,
         captureProgress: 0,
         beingCaptured: false,
+        awake: false,
       });
     }
 
@@ -331,10 +334,20 @@ export class Combat {
   private updateNests(deltaSeconds: number): void {
     for (let i = this.nests.length - 1; i >= 0; i--) {
       const nest = this.nests[i];
+
+      // A nest across the neighbourhood is scenery until you walk near it.
+      // This is what lets the map carry many of them without a thousand
+      // monsters converging from every direction at once.
+      const distanceToPlayer = Math.hypot(nest.x - this.anchorX, nest.y - this.anchorY);
+      nest.awake = distanceToPlayer < TUNING.nests.activateWithinMetres;
+      if (!nest.awake) {
+        nest.beingCaptured = false;
+        continue;
+      }
+
       nest.ageSeconds += deltaSeconds;
 
       /* --- are you standing on top of it? --- */
-      const distanceToPlayer = Math.hypot(nest.x - this.anchorX, nest.y - this.anchorY);
       nest.beingCaptured = distanceToPlayer < TUNING.capture.radiusMetres;
 
       if (nest.beingCaptured) {
@@ -424,6 +437,7 @@ export class Combat {
           seed: nest.seed + 104729,
           captureProgress: 0,
           beingCaptured: false,
+          awake: false,
         });
       }
     }
@@ -535,6 +549,10 @@ export class Combat {
 
     for (let id = 0; id < store.usedSlots; id++) {
       if (!store.alive[id] || store.kind[id] !== EntityKind.MONSTER) continue;
+
+      if (store.hitFlash[id] > 0) {
+        store.hitFlash[id] = Math.max(0, store.hitFlash[id] - deltaSeconds);
+      }
 
       const x = this.collision.toLocalX(store.lng[id]);
       const y = this.collision.toLocalY(store.lat[id]);
@@ -1011,6 +1029,7 @@ export class Combat {
   private hurtMonster(id: EntityId, damage: number): void {
     const store = this.entities;
     store.health[id] -= damage;
+    store.hitFlash[id] = TUNING.monsters.hitFlashSeconds;
     if (store.health[id] <= 0) this.killMonster(id, true);
   }
 

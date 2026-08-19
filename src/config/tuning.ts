@@ -312,6 +312,8 @@ export const TUNING = {
 
     /** Monsters further than this from the player give up and vanish. */
     despawnBeyondMetres: 320,
+    /** How long a monster flashes white after being hit, in seconds. */
+    hitFlashSeconds: 0.12,
     /**
      * How hard monsters push each other apart, so a crowd spreads into a mass
      * rather than stacking into one dot. Costs performance -- see the note in
@@ -329,8 +331,21 @@ export const TUNING = {
   /* NESTS -- where monsters come from                                       */
   /* ---------------------------------------------------------------------- */
   nests: {
-    /** How many exist in each patch of world. */
-    countPerCell: 2,
+    /**
+     * How many exist in each patch of world.
+     *
+     * Raised from 2. Most are asleep at any moment -- see activateWithinMetres
+     * -- so the map can carry a dozen without a dozen swarms converging at once.
+     * Walking around then means finding them, which is the point.
+     */
+    countPerCell: 12,
+    /**
+     * A nest is scenery until your real position is this close. Then it wakes,
+     * starts ageing and starts spawning.
+     *   SMALLER = the neighbourhood is quiet; you choose your fights.
+     *   LARGER  = several nests feed the same swarm and pressure stacks fast.
+     */
+    activateWithinMetres: 190,
     /**
      * How far from you they are placed, in metres.
      *
@@ -343,7 +358,7 @@ export const TUNING = {
      *   FURTHER = long quiet openings. Below about 100 m the wait disappears.
      */
     minDistanceMetres: 70,
-    maxDistanceMetres: 170,
+    maxDistanceMetres: 420,
     /** Seconds between monsters when a nest is brand new. */
     startingSpawnIntervalSeconds: 2.2,
     /**
@@ -532,6 +547,22 @@ export const TUNING = {
      *            would have to sprint to notice.
      */
     recalculateEveryMs: 250,
+    /**
+     * How much dearer it is for a monster to step off a road.
+     *
+     *   1   = roads are ignored; monsters cut straight across yards.
+     *   3.5 = they follow streets and only cut a corner when it is worth it.
+     *   10  = they will walk absurdly far rather than cross a car park.
+     */
+    offStreetPenalty: 2.5,
+    /**
+     * How wide a road counts as, either side of its centre line, in metres.
+     *
+     * Lowered from 5. At 5 m the painted roads covered 53% of the whole
+     * neighbourhood, which makes "prefer streets" meaningless -- almost
+     * everywhere was a street. Narrow roads make the preference bite.
+     */
+    streetHalfWidthMetres: 2.5,
   },
 
   /* ---------------------------------------------------------------------- */

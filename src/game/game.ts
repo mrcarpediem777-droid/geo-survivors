@@ -395,6 +395,22 @@ export class Game {
       // Give the pathfinding its own copy of where the buildings are. Done here,
       // once, rather than every time monsters need directions.
       this.flowField.rasteriseWalls(this.collision, 0, 0);
+
+      // ...and paint the roads on top, so the swarm pours down streets rather
+      // than drifting across back gardens in a straight line.
+      const streets = this.buildings.streetsNear(
+        around.lng,
+        around.lat,
+        TUNING.walls.loadRadiusMetres
+      );
+      this.flowField.rasteriseStreets(
+        streets,
+        around.lng,
+        around.lat,
+        111320 * Math.cos((around.lat * Math.PI) / 180),
+        TUNING.navigation.streetHalfWidthMetres,
+        TUNING.navigation.offStreetPenalty
+      );
       this.flowField.update(0, 0, performance.now());
 
       // Nests belong to the patch of world, so they move with it.

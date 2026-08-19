@@ -63,6 +63,7 @@ in vec2 a_offset;     // position RELATIVE to a nearby origin, in world-map unit
 in float a_radius;    // size, in those same world-map units
 in vec4 a_colour;
 in float a_shape;     // 0 = blob, 1 = gem, 2 = ring
+in float a_flash;     // 1 while this was just hit
 
 // The map's own conversion from world-map position to screen position, with the
 // origin shift already folded into it. This single value is what keeps
@@ -72,6 +73,7 @@ uniform mat4 u_matrix;
 out vec2 v_corner;
 out vec4 v_colour;
 out float v_shape;
+out float v_flash;
 
 void main() {
   vec2 localPosition = a_offset + a_corner * a_radius;
@@ -90,6 +92,7 @@ void main() {
   v_corner = a_corner;
   v_colour = a_colour;
   v_shape = a_shape;
+  v_flash = a_flash;
 }`;
 
 /**
@@ -102,6 +105,7 @@ precision mediump float;
 in vec2 v_corner;
 in vec4 v_colour;
 in float v_shape;
+in float v_flash;
 out vec4 fragColour;
 
 void main() {
@@ -134,6 +138,10 @@ void main() {
   // shape readable over roads, parks and water alike.
   float rim = smoothstep(0.70, 0.88, distanceFromCentre);
   vec3 shaded = mix(v_colour.rgb, v_colour.rgb * 0.45, rim);
+
+  // A hit washes the shape out toward white for a moment, which is the
+  // cheapest possible way to say "that connected".
+  shaded = mix(shaded, vec3(1.0, 0.96, 0.9), v_flash * 0.85);
 
   float alpha = v_colour.a * edgeFade;
 
@@ -175,8 +183,8 @@ void main() {
  * handled exactly.
  */
 
-/** Numbers per entity: offset x, offset y, radius, colour, shape. */
-const FLOATS_PER_INSTANCE = 5;
+/** Numbers per entity: offset x, offset y, radius, colour, shape, flash. */
+const FLOATS_PER_INSTANCE = 6;
 
 export class EntityLayer implements CustomLayerInterface {
   readonly id = 'geo-survivors-entities';
@@ -236,6 +244,7 @@ export class EntityLayer implements CustomLayerInterface {
     const radiusLocation = gl.getAttribLocation(this.program, 'a_radius');
     const colourLocation = gl.getAttribLocation(this.program, 'a_colour');
     const shapeLocation = gl.getAttribLocation(this.program, 'a_shape');
+    const flashLocation = gl.getAttribLocation(this.program, 'a_flash');
 
     this.vao = gl.createVertexArray();
     gl.bindVertexArray(this.vao);
@@ -277,6 +286,10 @@ export class EntityLayer implements CustomLayerInterface {
     gl.enableVertexAttribArray(shapeLocation);
     gl.vertexAttribPointer(shapeLocation, 1, gl.FLOAT, false, stride, 16);
     gl.vertexAttribDivisor(shapeLocation, 1);
+
+    gl.enableVertexAttribArray(flashLocation);
+    gl.vertexAttribPointer(flashLocation, 1, gl.FLOAT, false, stride, 20);
+    gl.vertexAttribDivisor(flashLocation, 1);
 
     gl.bindVertexArray(null);
   }
@@ -418,6 +431,7 @@ export class EntityLayer implements CustomLayerInterface {
       this.instanceBytes[colourByteOffset + 3] = store.colour[c + 3];
 
       data[offset + 4] = SHAPE_FOR_KIND[store.kind[id]] ?? 0;
+      data[offset + 5] = Math.min(1, store.hitFlash[id] * 8);
 
       written++;
     }

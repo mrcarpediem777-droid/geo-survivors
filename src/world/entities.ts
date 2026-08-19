@@ -91,6 +91,14 @@ export class EntityStore {
    * it to notice they are jammed on a corner and shove themselves sideways.
    */
   readonly stuckFor: Float32Array;
+  /**
+   * Seconds of flashing left after being hit.
+   *
+   * Without it there is no way to tell a monster you are hurting from one you
+   * are missing entirely -- the swarm just mills about and nothing reads as
+   * connecting.
+   */
+  readonly hitFlash: Float32Array;
 
   /** Colour, four bytes per entity (red, green, blue, alpha). */
   readonly colour: Uint8Array;
@@ -124,6 +132,7 @@ export class EntityStore {
     this.lifetime = new Float32Array(capacity);
     this.cooldown = new Float32Array(capacity);
     this.stuckFor = new Float32Array(capacity);
+    this.hitFlash = new Float32Array(capacity);
     this.colour = new Uint8Array(capacity * 4);
     this.kind = new Uint8Array(capacity);
     this.alive = new Uint8Array(capacity);
@@ -181,6 +190,7 @@ export class EntityStore {
     this.lifetime[id] = 0;
     this.cooldown[id] = 0;
     this.stuckFor[id] = 0;
+    this.hitFlash[id] = 0;
 
     const c = id * 4;
     this.colour[c] = colour[0];
