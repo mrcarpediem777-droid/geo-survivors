@@ -313,7 +313,12 @@ export const TUNING = {
     /** Monsters further than this from the player give up and vanish. */
     despawnBeyondMetres: 320,
     /** How long a monster flashes white after being hit, in seconds. */
-    hitFlashSeconds: 0.12,
+    /**
+     * How long a monster flashes white after being hit, in seconds.
+     * Lengthened from 0.12 -- at that speed the tester never saw it at all
+     * among a hundred moving shapes.
+     */
+    hitFlashSeconds: 0.22,
     /**
      * How hard monsters push each other apart, so a crowd spreads into a mass
      * rather than stacking into one dot. Costs performance -- see the note in
@@ -475,10 +480,27 @@ export const TUNING = {
      * cost something.
      */
     invulnerableAfterHitSeconds: 0.4,
-    /** How close an experience orb must be before it flies to you. */
-    pickupRadiusMetres: 14,
-    /** How fast orbs fly in once they notice you. */
-    pickupSpeedMps: 34,
+    /**
+     * How close you must be to sweep something up.
+     *
+     * Loot does NOT fly to you any more, by request: you collect it by walking
+     * over it, the way Vampire Survivors does.
+     *
+     * But walking is 1.4 m/s and monsters die up to 34 m away in every
+     * direction, so this number decides whether walking is worth anything at
+     * all. At 6 m a four-minute walk collected almost nothing. At 11 m, strolling
+     * down a street sweeps a band 22 m wide, which is enough to be rewarding
+     * without loot chasing you.
+     *   SMALLER = you must walk deliberately over each piece.
+     *   LARGER  = closer to the old behaviour where everything came to you.
+     */
+    pickupRadiusMetres: 11,
+    /** How long loot lies on the ground before fading, in seconds. */
+    lootLifetimeSeconds: 120,
+    /** Chance that a dead monster leaves money as well as experience. */
+    coinDropChance: 0.16,
+    /** How much a coin is worth. */
+    coinValue: 3,
   },
 
   /* ---------------------------------------------------------------------- */

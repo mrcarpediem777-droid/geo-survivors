@@ -582,6 +582,14 @@ export class Game {
     // The status line doubles as a diagnostic. When something upstream fails --
     // no walls means no nests means no monsters -- this is the difference
     // between "nothing is happening" and knowing exactly which step broke.
+    // Bank whatever was picked up, as it is picked up. Losing a run should
+    // never lose the money you walked over to collect.
+    if (this.combat.coinsCollected > 0 && this.profile) {
+      const banked = this.combat.coinsCollected;
+      this.combat.coinsCollected = 0;
+      this.profile.update({ essence: this.profile.get().essence + banked });
+    }
+
     const nestDistance = this.combat.nearestNestDistance();
     const essence = this.profile?.get().essence ?? 0;
 

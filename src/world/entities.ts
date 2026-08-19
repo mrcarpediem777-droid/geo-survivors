@@ -35,8 +35,14 @@ export const EntityKind = {
   NEST: 4,
   /** Only used in M2, to prove things stay stuck to the map. */
   TEST_MARKER: 5,
-  /** Experience dropped by a dead monster. */
+  /** Experience dropped by a dead monster. Levels you up during a run. */
   XP_ORB: 6,
+  /**
+   * Money dropped by a dead monster. Kept forever and spent on permanent
+   * upgrades -- deliberately a different thing from experience, so a good run
+   * and long-term progress are earned separately.
+   */
+  COIN: 7,
 } as const;
 
 export type EntityKindValue = (typeof EntityKind)[keyof typeof EntityKind];
@@ -49,7 +55,8 @@ export const KIND_COLOURS: Record<number, [number, number, number, number]> = {
   [EntityKind.PICKUP]: [120, 220, 140, 255], // green
   [EntityKind.NEST]: [160, 80, 220, 255], // purple
   [EntityKind.TEST_MARKER]: [180, 180, 190, 200], // grey -- a debug aid, never loot
-  [EntityKind.XP_ORB]: [255, 214, 64, 255], // gold -- unmistakably loot
+  [EntityKind.XP_ORB]: [120, 220, 255, 255], // pale blue -- experience
+  [EntityKind.COIN]: [255, 200, 50, 255], // gold -- money
 };
 
 /** A handle to one entity. It is just its slot number in the arrays. */
