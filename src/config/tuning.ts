@@ -126,9 +126,20 @@ export const TUNING = {
      * many metres from your real (smoothed) GPS position.
      *   SMALLER = more honest to your real location, less room to dodge.
      *   LARGER  = more comfortable combat, but the game drifts from reality.
-     * Used from M2 onward.
+     * SET THIS TO 0 TO REMOVE THE THUMBSTICK ENTIRELY. The character is then
+     * pinned to your real position and moves only when you do, and the stick
+     * disappears from the screen.
+     *
+     * Before doing that, the two things the brief warned about, in your own
+     * words: dodging becomes something you do with your feet on a pavement
+     * while looking at a phone, and the character inherits the raw wobble of
+     * GPS, which is 5-20 m. The leash exists precisely to avoid both. It is
+     * NOW SET TO 0 ON THE DESIGNER'S DECISION, made after the trade-off was put
+     * to her: there is no steered character any more. You are the blue dot,
+     * exactly where your phone says you are, and the only way to move is to
+     * walk. Set it back to 28 to restore the rope and the thumbstick.
      */
-    radiusMetres: 28,
+    radiusMetres: 0,
     /** How fast the steered character moves, in metres per second. */
     characterSpeedMps: 22,
     /**
@@ -194,7 +205,24 @@ export const TUNING = {
     /**
      * READ THIS BEFORE CHANGING ANY SPEED.
      *
-     * HEALTH WAS DOUBLED after the shooters were removed. Without it the front
+     * HEALTH IS A BALANCE BETWEEN TWO MEASURED FAILURES, and it is worth knowing
+     * which way each one goes.
+     *
+     * Too tough (55 for a swarmer) and the starting weapon needs seven seconds
+     * per kill: eleven kills in a whole run, no experience, no upgrades, dead at
+     * level one. Too fragile and a fully upgraded player pushes the swarm back
+     * to a ring that never closes and cannot lose.
+     *
+     * What actually brings monsters to you is NUMBERS, not toughness -- they
+     * arrive because a single-target weapon cannot keep up with ninety of them.
+     *
+     * The older note below still applies to the shape of the problem. This is the number
+     * that decides whether the game is a fight or a screensaver. Measured: a
+     * monster needs about four seconds under fire to close from the edge of your
+     * weapons to touching distance, so anything that dies faster than that can
+     * never actually reach you -- and for a long while nothing did.
+     *
+     * Health was doubled once already after the shooters were removed. Without it the front
      * rank died exactly as fast as the next rank arrived, so a siege line formed
      * about 20 m out and never closed -- measured: eight minutes, 440 monsters
      * alive, and the player never once took damage. Tougher monsters break that
@@ -219,8 +247,8 @@ export const TUNING = {
         name: 'swarmer',
         /** Fast, weak, arrives in crowds. The bread and butter. */
         speedMps: 1.3,
-        health: 20,
-        damagePerSecond: 10,
+        health: 26,
+        damagePerSecond: 6,
         radiusMetres: 1.6,
         xp: 1,
         colour: [220, 70, 70, 255],
@@ -230,8 +258,8 @@ export const TUNING = {
         name: 'brute',
         /** Slow and tough. Blocks alleys and soaks damage. */
         speedMps: 0.75,
-        health: 110,
-        damagePerSecond: 22,
+        health: 120,
+        damagePerSecond: 13,
         radiusMetres: 2.8,
         xp: 5,
         colour: [180, 60, 110, 255],
@@ -273,8 +301,8 @@ export const TUNING = {
          * shoots at you.
          */
         speedMps: 1.35,
-        health: 46,
-        damagePerSecond: 17,
+        health: 50,
+        damagePerSecond: 9,
         radiusMetres: 2.0,
         xp: 3,
         colour: [230, 140, 50, 255],
@@ -343,8 +371,16 @@ export const TUNING = {
     openingWaveMinMetres: 34,
     openingWaveMaxMetres: 62,
 
-    /** A nest will not have more than this many of its monsters alive at once. */
-    maxAlivePerNest: 220,
+    /**
+     * A nest will not have more than this many of its monsters alive at once.
+     *
+     * THIS NUMBER DECIDES WHETHER THE GAME CAN BE LOST. Raised from 220 after
+     * measuring the reason a standing player was immortal: nests reach the cap,
+     * spawning stops, and the player's damage keeps growing with every level --
+     * so a perimeter forms at about 15 m and never closes again. The swarm has
+     * to be able to out-grow the player, or standing still is a win.
+     */
+    maxAlivePerNest: 450,
     /** How big a nest looks, in metres. */
     radiusMetres: 6,
   },
@@ -392,7 +428,13 @@ export const TUNING = {
   /* THE PLAYER IN COMBAT                                                    */
   /* ---------------------------------------------------------------------- */
   player: {
-    maxHealth: 100,
+    /**
+     * Raised from 100. Once monsters could genuinely reach the player, several
+     * touching at once removed a hundred health in about two seconds -- runs
+     * ended at level one, before a single upgrade. With no way to dodge, health
+     * has to be the buffer that movement used to be.
+     */
+    maxHealth: 180,
     /**
      * Health regained per second, so small mistakes are not permanent.
      *
@@ -419,10 +461,27 @@ export const TUNING = {
   /* ---------------------------------------------------------------------- */
   weapons: {
     /** The weapon everyone starts with. */
-    startingBoltDamage: 7,
+    startingBoltDamage: 11,
     startingBoltIntervalSeconds: 0.85,
-    startingBoltRangeMetres: 42,
+    /**
+     * How far the starting weapon reaches.
+     *
+     * Cut from 42 m. At combat zoom the screen shows about 76 m across, so
+     * anything beyond roughly 34 m from the middle is off the edge -- and
+     * watching your weapon fire at something you cannot see is unreadable. If
+     * you cannot see it, you should not be shooting it.
+     */
+    startingBoltRangeMetres: 24,
     startingBoltSpeedMps: 40,
+    /**
+     * A hard ceiling on every weapon's reach, applied AFTER upgrade cards.
+     *
+     * Without this, stacking the range card eventually pushes shots past the
+     * edge of the screen again and the same unreadable problem returns. Range
+     * upgrades still help -- they get short weapons up to this line faster --
+     * but nothing ever fires at something you cannot see.
+     */
+    maxRangeMetres: 34,
     /** How long a shot lives before fading, in seconds. */
     projectileLifetimeSeconds: 2.2,
   },

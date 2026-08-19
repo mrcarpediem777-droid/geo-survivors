@@ -87,6 +87,17 @@ export class PlayerCharacter {
 
     const radius = TUNING.leash.radiusMetres + leashBonusMetres;
 
+    // A leash of zero means "there is no thumbstick": you simply are wherever
+    // your real position is. Handled here rather than by deleting the joystick,
+    // so the decision stays one number in the tuning file and can be tried on a
+    // street and undone in the cafe afterwards.
+    if (TUNING.leash.radiusMetres <= 0) {
+      this.position.lng = anchor.lng;
+      this.position.lat = anchor.lat;
+      this.placed = true;
+      return;
+    }
+
     // First fix, or the anchor jumped absurdly far: just appear there.
     if (!this.placed || distanceMetres(anchor, this.position) > radius * 6) {
       this.snapTo(anchor);

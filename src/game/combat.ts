@@ -67,6 +67,16 @@ export class Combat {
   /** True while a level-up card choice is waiting. The world stands still. */
   awaitingCardChoice = false;
 
+  /**
+   * Latched the moment health runs out.
+   *
+   * Without it, regeneration lifts health a hair above zero on the very next
+   * frame, the run carries on, and the death event fires again and again --
+   * measured: a player "died" at 100 s and the simulation happily continued to
+   * 200 s with the death screen being raised repeatedly.
+   */
+  private dead = false;
+
   /** Card choices earned but not yet shown, so none is ever lost. */
   private pendingLevelUps = 0;
 
@@ -252,6 +262,7 @@ export class Combat {
     this.livingMonsters = 0;
     this.awaitingCardChoice = false;
     this.pendingLevelUps = 0;
+    this.dead = false;
   }
 
   /* ------------------------------------------------------------------ */
@@ -262,7 +273,7 @@ export class Combat {
     // While a card choice is open the world holds its breath. Vampire Survivors
     // does the same, and it is what makes a level-up feel like a decision rather
     // than an interruption.
-    if (this.awaitingCardChoice) return;
+    if (this.awaitingCardChoice || this.dead) return;
 
     this.runTimeSeconds += deltaSeconds;
     this.invulnerableFor = Math.max(0, this.invulnerableFor - deltaSeconds);
@@ -695,9 +706,21 @@ export class Combat {
 
   private rangeFor(id: string): number {
     const base = TUNING.weapons.startingBoltRangeMetres;
-    if (id === WeaponId.SCATTER) return base * 0.5;
-    if (id === WeaponId.LANCE) return base * 1.8;
+    if (id === WeaponId.SCATTER) return base * 0.55;
+    if (id === WeaponId.LANCE) return base * 1.35;
     return base;
+  }
+
+  /**
+   * Reach after upgrades, never past what the player can actually see.
+   * The cap is the whole point -- firing at an unseen target reads as the game
+   * wasting shots on nothing.
+   */
+  private cappedRange(id: string): number {
+    return Math.min(
+      this.rangeFor(id) * this.loadout.rangeMultiplier,
+      TUNING.weapons.maxRangeMetres
+    );
   }
 
   /** Fire something that picks a target. Returns false if nothing is in range. */
@@ -707,7 +730,7 @@ export class Combat {
     playerX: number,
     playerY: number
   ): boolean {
-    const range = this.rangeFor(id) * this.loadout.rangeMultiplier;
+    const range = this.cappedRange(id);
     const target = this.nearestMonster(playerX, playerY, range);
     if (target < 0) return false;
 
@@ -769,7 +792,7 @@ export class Combat {
     deltaSeconds: number
   ): void {
     const blades = 2 + level;
-    const orbitRadius = 9 * this.loadout.rangeMultiplier;
+    const orbitRadius = Math.min(9 * this.loadout.rangeMultiplier, TUNING.weapons.maxRangeMetres);
     const damage = TUNING.weapons.startingBoltDamage * 1.6 * this.loadout.damageMultiplier * deltaSeconds;
     const bladeRadius = 3.2;
 
@@ -783,7 +806,7 @@ export class Combat {
 
   /** A ring of force pushing out of the player. */
   private firePulse(level: number, playerX: number, playerY: number): void {
-    const radius = (14 + level * 3) * this.loadout.rangeMultiplier;
+    const radius = Math.min((14 + level * 3) * this.loadout.rangeMultiplier, TUNING.weapons.maxRangeMetres);
     const damage = TUNING.weapons.startingBoltDamage * (1.1 + level * 0.4) * this.loadout.damageMultiplier;
     this.damageMonstersAround(playerX, playerY, radius, damage);
   }
@@ -975,8 +998,9 @@ export class Combat {
     // crowd -- otherwise standing in a swarm would be free.
     if (taken > 3) this.invulnerableFor = TUNING.player.invulnerableAfterHitSeconds;
 
-    if (this.health <= 0) {
+    if (this.health <= 0 && !this.dead) {
       this.health = 0;
+      this.dead = true;
       this.events.onDeath();
     }
   }

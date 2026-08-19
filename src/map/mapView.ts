@@ -378,6 +378,16 @@ export class MapView {
    * This is the position the game trusts.
    */
   setAnchorPosition(position: LatLng): void {
+    // With no rope, the character and your real position are the same point, so
+    // drawing both put two dots on top of each other. The game's own layer draws
+    // the blue dot; this one steps aside.
+    if (TUNING.leash.radiusMetres <= 0) {
+      if (this.followPlayer && !this.cameraDrivenByGame) {
+        this.map.easeTo({ center: [position.lng, position.lat], duration: 450 });
+      }
+      return;
+    }
+
     if (!this.playerMarker) {
       this.playerMarker = new Marker({
         element: buildAnchorRing(),

@@ -43,7 +43,7 @@ export type EntityKindValue = (typeof EntityKind)[keyof typeof EntityKind];
 
 /** Placeholder colours. Real art comes much later -- these are just shapes. */
 export const KIND_COLOURS: Record<number, [number, number, number, number]> = {
-  [EntityKind.PLAYER]: [255, 255, 255, 255], // white, so you never lose yourself in a crowd
+  [EntityKind.PLAYER]: [59, 130, 246, 255], // blue -- the one dot, and it is you
   [EntityKind.MONSTER]: [220, 70, 70, 255], // red
   [EntityKind.PROJECTILE]: [250, 220, 120, 255], // pale yellow
   [EntityKind.PICKUP]: [120, 220, 140, 255], // green
