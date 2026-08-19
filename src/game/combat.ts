@@ -331,6 +331,13 @@ export class Combat {
     this.anchorY = y;
   }
 
+  /** Extra chance of money dropping, from the chosen character. */
+  private coinBonus = 0;
+
+  setCoinBonus(bonus: number): void {
+    this.coinBonus = bonus;
+  }
+
   setCaptureSpeed(multiplier: number): void {
     this.captureSpeedMultiplier = multiplier;
   }
@@ -831,7 +838,19 @@ export class Combat {
     return base * (1 + (level - 1) * 0.32);
   }
 
-  /** Blades circling the player, damaging whatever they sweep through. */
+  /**
+   * Blades circling the player, cutting whatever comes close.
+   *
+   * They used to damage only things at the exact ring the blades ride on, which
+   * looked right and played terribly: anything that walked THROUGH the ring and
+   * reached the player was never touched again. Measured with the character
+   * built entirely around this weapon -- four monsters standing on top of the
+   * player, blades sweeping empty air, zero kills, dead in 45 seconds.
+   *
+   * It now cuts anything inside the circle, which is what "blades circle you"
+   * plainly means. The target limit is what stops it becoming an unbreakable
+   * wall, and that is still there.
+   */
   private tickOrbit(
     level: number,
     spin: number,
@@ -840,17 +859,14 @@ export class Combat {
     deltaSeconds: number
   ): void {
     const blades = 2 + level;
-    const orbitRadius = Math.min(9 * this.loadout.rangeMultiplier, TUNING.weapons.maxRangeMetres);
-    const damage = TUNING.weapons.startingBoltDamage * 1.6 * this.loadout.damageMultiplier * deltaSeconds;
-    const bladeRadius = 3.2;
+    const reach = Math.min(14 * this.loadout.rangeMultiplier, TUNING.weapons.maxRangeMetres);
+    const damage =
+      TUNING.weapons.startingBoltDamage * 1.6 * blades * this.loadout.damageMultiplier * deltaSeconds;
 
-    for (let i = 0; i < blades; i++) {
-      const angle = spin + (i / blades) * Math.PI * 2;
-      const bx = playerX + Math.cos(angle) * orbitRadius;
-      const by = playerY + Math.sin(angle) * orbitRadius;
-      // One blade, one victim at a time. More blades is what levelling buys.
-      this.damageMonstersAround(bx, by, bladeRadius, damage, 1);
-    }
+    // `spin` only drives how it will be drawn later; the cutting is the circle.
+    void spin;
+
+    this.damageMonstersAround(playerX, playerY, reach, damage, blades * (1 + level));
   }
 
   /** A ring of force pushing out of the player. */
@@ -1066,7 +1082,7 @@ export class Combat {
       }
 
       // Money is rarer than experience, and buys things that outlast the run.
-      if (this.random() < TUNING.player.coinDropChance) {
+      if (this.random() < TUNING.player.coinDropChance + this.coinBonus) {
         const coin = this.entities.spawn(EntityKind.COIN, dropLng, dropLat, 1.3);
         if (coin >= 0) {
           this.entities.value[coin] = TUNING.player.coinValue;

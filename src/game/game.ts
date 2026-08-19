@@ -34,6 +34,7 @@ import { CombatHud } from '../ui/combatHud';
 import { freshLoadout, pickCards, type Loadout, type UpgradeCard } from './upgrades';
 import { seededRandom } from '../world/determinism';
 import { bonusesFrom, costToBuy, META_UPGRADES, type MetaLevels } from './metaProgress';
+import { CHARACTERS, characterById } from './characters';
 import type { Profile } from '../profile/profile';
 import { worldCellFor } from '../world/determinism';
 import { activeBasemap } from '../config/basemap';
@@ -126,6 +127,9 @@ export class Game {
   /** Where permanent progress is kept. Set by main.ts right after construction. */
   profile: Profile | null = null;
 
+  /** Which emoji the player is drawn as, decided by the chosen character. */
+  playerSprite = 7;
+
   constructor(map: MapLibreMap, uiContainer: HTMLElement, startAt: LatLng, useMirror = false) {
     this.map = map;
     this.buildings = new BuildingSource(useMirror);
@@ -195,9 +199,38 @@ export class Game {
     this.hud.showShop(
       data.essence,
       data.metaLevels,
+      data.unlockedCharacters,
+      data.selectedCharacter,
       (id) => this.buyUpgrade(id),
+      (id) => this.chooseOrBuyCharacter(id),
       () => {}
     );
+  }
+
+  /**
+   * Tapping a character either selects it, or buys it if it is not yours yet.
+   * One control for both, because two would need explaining.
+   */
+  private chooseOrBuyCharacter(id: string): void {
+    if (!this.profile) return;
+    const data = this.profile.get();
+    const hero = CHARACTERS.find((c) => c.id === id);
+    if (!hero) return;
+
+    if (data.unlockedCharacters.includes(id)) {
+      this.profile.update({ selectedCharacter: id });
+    } else {
+      if (data.essence < hero.cost) return;
+      this.profile.update({
+        essence: data.essence - hero.cost,
+        unlockedCharacters: [...data.unlockedCharacters, id],
+        selectedCharacter: id,
+      });
+    }
+
+    // A character only takes effect from the next run, so say so by starting one.
+    this.openShop();
+    this.restartRun();
   }
 
   private buyUpgrade(id: string): void {
@@ -244,6 +277,20 @@ export class Game {
   restartRun(): void {
     this.loadout = freshLoadout();
     this.cardsTaken.clear();
+    // Whoever you chose to play as decides what you start holding and what
+    // you are good at. This happens before permanent upgrades, so both stack.
+    const hero = characterById(this.profile?.get().selectedCharacter ?? 'wanderer');
+    this.loadout.weapons = [{ id: hero.startingWeapon, level: 1, cooldown: 0, spin: 0 }];
+    this.loadout.maxHealthBonus += hero.healthBonus;
+    this.loadout.damageMultiplier *= hero.damageMultiplier;
+    this.loadout.rangeMultiplier *= hero.rangeMultiplier;
+    this.loadout.fireRateMultiplier *= hero.fireRateMultiplier;
+    this.loadout.pickupRadiusMultiplier *= hero.pickupMultiplier;
+    this.loadout.armour = Math.min(0.6, this.loadout.armour + hero.armour);
+    this.combat.setCoinBonus(hero.coinBonus);
+    this.playerSprite = hero.sprite;
+    this.layer.playerSprite = hero.sprite;
+
     // Fold permanent progress into the fresh loadout.
     const meta = this.metaBonuses();
     this.loadout.maxHealthBonus += meta.bonusHealth;

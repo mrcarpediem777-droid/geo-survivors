@@ -316,9 +316,25 @@ forbids anything that would make a person hurry across a road. Step away and pro
 fades slowly rather than resetting, so backing off from a scooter costs you a few seconds,
 not a minute.
 
-**Essence is permanent.** Tap the status line at the top of the screen to spend it on six
-upgrades that survive death — health, damage, rope length, pickup range, movement, and
-clearing speed. Deliberately small: they widen the door, they do not walk through it for
+**Coins buy characters.** Tap the status line at the top of the screen to open the shop.
+Five characters, each starting with a different weapon and a different shape of strengths,
+so the cards worth taking change with who you are playing:
+
+| | | |
+|---|---|---|
+| 🔵 | **Wanderer** | free — the plain, fair one |
+| 🌀 | **Bladedancer** | 220 — orbiting blades, tough, wants the swarm on top of it |
+| 🎯 | **Sniper** | 320 — the lance, longest reach, fragile |
+| 🛡️ | **Bruiser** | 400 — scattergun, shrugs off damage, short reach |
+| 🧲 | **Collector** | 520 — sweeps loot from twice as far, finds far more money, fights badly |
+
+None is strictly better than another, and the free one is deliberately a fair baseline
+rather than the worst — a starter ten times weaker than what you can buy would be a
+miserable first impression, and it edges toward selling power, which the brief rules out.
+
+**Essence also buys permanent upgrades.** Six of them, in the same shop, spent on
+upgrades that survive death — health, damage, reach, pickup range, movement and clearing
+speed. Deliberately small: they widen the door, they do not walk through it for
 you. The cards inside a run are still where the real decisions live.
 
 The shop opens at any time, including mid-fight, for the same reason there is no travel

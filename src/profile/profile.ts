@@ -50,10 +50,14 @@ export interface ProfileData {
   nestsCleared: number;
   bestSurvivalSeconds: number;
   bestLevel: number;
+  /** Characters bought so far. The first one is always there. */
+  unlockedCharacters: string[];
+  /** Which one is being played. */
+  selectedCharacter: string;
 }
 
 const STORAGE_KEY = 'geo-survivors.profile';
-const CURRENT_VERSION = 3;
+const CURRENT_VERSION = 4;
 
 function freshProfile(): ProfileData {
   return {
@@ -69,6 +73,8 @@ function freshProfile(): ProfileData {
     nestsCleared: 0,
     bestSurvivalSeconds: 0,
     bestLevel: 1,
+    unlockedCharacters: ['wanderer'],
+    selectedCharacter: 'wanderer',
   };
 }
 
@@ -112,6 +118,10 @@ export class Profile {
           nestsCleared: parsed.nestsCleared ?? 0,
           bestSurvivalSeconds: parsed.bestSurvivalSeconds ?? 0,
           bestLevel: parsed.bestLevel ?? 1,
+          // Version 4 adds characters. Anyone upgrading keeps their money and
+          // simply starts with the free one.
+          unlockedCharacters: parsed.unlockedCharacters ?? ['wanderer'],
+          selectedCharacter: parsed.selectedCharacter ?? 'wanderer',
         };
       }
 
