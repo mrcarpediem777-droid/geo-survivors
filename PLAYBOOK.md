@@ -142,10 +142,16 @@ drawn.
 
 | | |
 |---|---|
-| **White circle** | you |
-| **Red, pink and orange circles** | monsters |
-| **Gold diamonds** | experience — walk near and it flies to you |
-| **Purple rings** | nests |
+| 🔵 | you |
+| 🕷️ 🐗 🦂 | monsters — spider, boar, scorpion |
+| 💠 | experience — **walk over it to collect** |
+| 🪙 | money — kept forever, spent on permanent upgrades |
+| 🕳️ | a nest |
+
+Monsters flash white when you hurt them. Loot lies where it fell: nothing comes to you,
+so a run's reward depends on covering ground. Measured: standing still for five minutes
+earns almost nothing, while walking a slow loop reached level 8 with 162 coins and 497
+kills — and died doing it.
 
 Test markers used to sit here too — grey rings at 10, 25 and 50 m that proved game
 objects stay welded to the map. They were scaffolding for M2 and are no longer shown in

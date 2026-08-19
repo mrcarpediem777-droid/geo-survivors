@@ -32,17 +32,24 @@ import {
   type Map as MapLibreMap,
 } from 'maplibre-gl';
 import { EntityKind, type EntityStore } from '../world/entities';
+import { buildEmojiAtlas, SpriteIndex, MONSTER_SPRITE_COUNT, type AtlasInfo } from './emojiAtlas';
 
-/** Which outline each sort of thing is drawn with. */
-const SHAPE_FOR_KIND: Record<number, number> = {
-  [EntityKind.PLAYER]: 0,
-  [EntityKind.MONSTER]: 0,
-  [EntityKind.PROJECTILE]: 0,
-  [EntityKind.XP_ORB]: 1,
-  [EntityKind.PICKUP]: 1,
-  [EntityKind.NEST]: 2,
-  [EntityKind.TEST_MARKER]: 1,
+/** Which picture each sort of thing uses. Monsters choose by their variant. */
+const SPRITE_FOR_KIND: Record<number, number> = {
+  [EntityKind.PLAYER]: SpriteIndex.PLAYER,
+  [EntityKind.PROJECTILE]: SpriteIndex.PROJECTILE,
+  [EntityKind.XP_ORB]: SpriteIndex.XP,
+  [EntityKind.COIN]: SpriteIndex.COIN,
+  [EntityKind.PICKUP]: SpriteIndex.COIN,
+  [EntityKind.NEST]: SpriteIndex.NEST,
+  [EntityKind.TEST_MARKER]: SpriteIndex.XP,
 };
+
+/**
+ * Monster variants index straight into the sprite list -- variant 0 is the first
+ * sprite, variant 1 the second, and so on. Keeping them in the same order
+ * removes a whole class of quiet mistake.
+ */
 
 /**
  * Runs once per CORNER of each shape.
@@ -62,7 +69,7 @@ in vec2 a_corner;
 in vec2 a_offset;     // position RELATIVE to a nearby origin, in world-map units
 in float a_radius;    // size, in those same world-map units
 in vec4 a_colour;
-in float a_shape;     // 0 = blob, 1 = gem, 2 = ring
+in float a_sprite;    // which picture in the sheet
 in float a_flash;     // 1 while this was just hit
 
 // The map's own conversion from world-map position to screen position, with the
@@ -72,8 +79,12 @@ uniform mat4 u_matrix;
 
 out vec2 v_corner;
 out vec4 v_colour;
-out float v_shape;
 out float v_flash;
+out vec2 v_uv;
+
+// Where each picture sits in the sheet.
+uniform vec2 u_cellSize;
+uniform float u_columns;
 
 void main() {
   vec2 localPosition = a_offset + a_corner * a_radius;
@@ -91,8 +102,15 @@ void main() {
 
   v_corner = a_corner;
   v_colour = a_colour;
-  v_shape = a_shape;
   v_flash = a_flash;
+
+  // Turn "which picture" into a position inside the sheet, then pick the
+  // matching corner of that picture.
+  float column = mod(a_sprite, u_columns);
+  float row = floor(a_sprite / u_columns);
+  vec2 corner01 = (a_corner + 1.0) * 0.5;
+  corner01.y = 1.0 - corner01.y;
+  v_uv = (vec2(column, row) + corner01) * u_cellSize;
 }`;
 
 /**
@@ -104,86 +122,29 @@ precision mediump float;
 
 in vec2 v_corner;
 in vec4 v_colour;
-in float v_shape;
 in float v_flash;
+in vec2 v_uv;
 out vec4 fragColour;
 
+uniform sampler2D u_sheet;
+
 void main() {
-  // THREE SHAPES, so a glance is enough to tell things apart.
-  //
-  // Colour alone was not sufficient on a real phone: at combat zoom everything
-  // is small and a pale blue experience orb read as just another creature. A
-  // monster, a pickup and a nest now differ in outline, not only in hue.
-  float distanceFromCentre;
+  vec4 picture = texture(u_sheet, v_uv);
 
-  if (v_shape > 1.5) {
-    // NEST: a thick ring, so it reads as a place rather than a creature.
-    distanceFromCentre = length(v_corner);
-    if (distanceFromCentre > 1.0 || distanceFromCentre < 0.55) discard;
-  } else if (v_shape > 0.5) {
-    // PICKUP: a diamond. Sharp corners are unmistakably "not alive".
-    distanceFromCentre = abs(v_corner.x) + abs(v_corner.y);
-    if (distanceFromCentre > 1.0) discard;
-  } else {
-    // MONSTER or PLAYER: a plain round blob.
-    distanceFromCentre = length(v_corner);
-    if (distanceFromCentre > 1.0) discard;
-  }
+  // Emoji arrive with ordinary transparency; the map wants it multiplied in.
+  vec3 colour = picture.rgb;
+  float alpha = picture.a * v_colour.a;
 
-  // Soften the last sliver so the edge is not jagged.
-  float edgeFade = smoothstep(1.0, 0.90, distanceFromCentre);
+  // Being hit washes the whole thing toward white for a moment. Emoji are
+  // already colourful, so a tint would not read -- it has to be a real flash.
+  colour = mix(colour, vec3(1.0), v_flash);
+  alpha = min(1.0, alpha + v_flash * picture.a * 0.4);
 
-  // Darken the outer ring. Placeholder art, but it matters more than it sounds:
-  // a flat circle vanishes against a busy map, and a darker rim makes every
-  // shape readable over roads, parks and water alike.
-  float rim = smoothstep(0.70, 0.88, distanceFromCentre);
-  vec3 shaded = mix(v_colour.rgb, v_colour.rgb * 0.45, rim);
-
-  // A hit washes the shape out toward white for a moment, which is the
-  // cheapest possible way to say "that connected".
-  shaded = mix(shaded, vec3(1.0, 0.96, 0.9), v_flash * 0.85);
-
-  float alpha = v_colour.a * edgeFade;
-
-  // The map expects colours with the transparency already multiplied in.
-  fragColour = vec4(shaded * alpha, alpha);
+  if (alpha < 0.01) discard;
+  fragColour = vec4(colour * alpha, alpha);
 }`;
 
-/**
- * ORIGIN SHIFT -- why entity positions are sent as offsets.
- * =========================================================
- * This is the single subtlest thing in the renderer, and getting it wrong makes
- * every entity invisible while every other check still passes. Worth reading.
- *
- * Graphics cards work in 32-bit numbers, which carry about 7 useful digits.
- * A position on the world map is a fraction of the way across the whole Earth --
- * roughly 0.8006 for Vietnam. Spending 7 digits on that leaves almost nothing
- * for the detail we care about:
- *
- *   - the smallest difference a 32-bit number can express near 0.8
- *     works out at about 2.3 METRES on the ground, and
- *   - a 2.5-metre monster is 1.09 of those steps across.
- *
- * So `centre + corner * radius` -- the obvious way to build a square around a
- * point -- collapses to zero size, because the radius is smaller than the
- * smallest difference the number can hold. Nothing draws. No error is raised.
- * The draw call succeeds, reports the right number of shapes, and paints
- * nothing.
- *
- * THE FIX, which is what professional map and globe renderers all do:
- * do the big subtraction on the processor in 64-bit numbers, and send the
- * graphics card only the small leftovers.
- *
- *   1. pick an origin near the action (we use the middle of the screen)
- *   2. send each entity's offset FROM that origin -- a tiny number, around
- *      0.00001, where 32 bits give us nanometre precision
- *   3. fold the origin into the camera matrix, in 64-bit, before sending it
- *
- * Same result, but every number the graphics card sees is small enough to be
- * handled exactly.
- */
-
-/** Numbers per entity: offset x, offset y, radius, colour, shape, flash. */
+/** Numbers per entity: offset x, offset y, radius, colour, sprite, flash. */
 const FLOATS_PER_INSTANCE = 6;
 
 export class EntityLayer implements CustomLayerInterface {
@@ -199,6 +160,11 @@ export class EntityLayer implements CustomLayerInterface {
   private cornerBuffer: WebGLBuffer | null = null;
   private instanceBuffer: WebGLBuffer | null = null;
   private matrixLocation: WebGLUniformLocation | null = null;
+  private sheetLocation: WebGLUniformLocation | null = null;
+  private cellSizeLocation: WebGLUniformLocation | null = null;
+  private columnsLocation: WebGLUniformLocation | null = null;
+  private texture: WebGLTexture | null = null;
+  private atlas: AtlasInfo | null = null;
 
   /**
    * The data we hand to the graphics card, built fresh each frame but into a
@@ -238,12 +204,29 @@ export class EntityLayer implements CustomLayerInterface {
     this.map = map;
     this.program = buildProgram(gl, VERTEX_SHADER, FRAGMENT_SHADER);
     this.matrixLocation = gl.getUniformLocation(this.program, 'u_matrix');
+    this.sheetLocation = gl.getUniformLocation(this.program, 'u_sheet');
+    this.cellSizeLocation = gl.getUniformLocation(this.program, 'u_cellSize');
+    this.columnsLocation = gl.getUniformLocation(this.program, 'u_columns');
+
+    // Draw every emoji once, hand the sheet to the graphics card, and never
+    // think about text again.
+    this.atlas = buildEmojiAtlas();
+    this.texture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, this.texture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this.atlas.canvas);
+    // Smooth when small, and clamp so one picture never bleeds into its
+    // neighbour on the sheet.
+    gl.generateMipmap(gl.TEXTURE_2D);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
     const cornerLocation = gl.getAttribLocation(this.program, 'a_corner');
     const offsetLocation = gl.getAttribLocation(this.program, 'a_offset');
     const radiusLocation = gl.getAttribLocation(this.program, 'a_radius');
     const colourLocation = gl.getAttribLocation(this.program, 'a_colour');
-    const shapeLocation = gl.getAttribLocation(this.program, 'a_shape');
+    const spriteLocation = gl.getAttribLocation(this.program, 'a_sprite');
     const flashLocation = gl.getAttribLocation(this.program, 'a_flash');
 
     this.vao = gl.createVertexArray();
@@ -283,9 +266,9 @@ export class EntityLayer implements CustomLayerInterface {
     gl.vertexAttribPointer(colourLocation, 4, gl.UNSIGNED_BYTE, true, stride, 12);
     gl.vertexAttribDivisor(colourLocation, 1);
 
-    gl.enableVertexAttribArray(shapeLocation);
-    gl.vertexAttribPointer(shapeLocation, 1, gl.FLOAT, false, stride, 16);
-    gl.vertexAttribDivisor(shapeLocation, 1);
+    gl.enableVertexAttribArray(spriteLocation);
+    gl.vertexAttribPointer(spriteLocation, 1, gl.FLOAT, false, stride, 16);
+    gl.vertexAttribDivisor(spriteLocation, 1);
 
     gl.enableVertexAttribArray(flashLocation);
     gl.vertexAttribPointer(flashLocation, 1, gl.FLOAT, false, stride, 20);
@@ -299,6 +282,7 @@ export class EntityLayer implements CustomLayerInterface {
     if (this.vao) gl.deleteVertexArray(this.vao);
     if (this.cornerBuffer) gl.deleteBuffer(this.cornerBuffer);
     if (this.instanceBuffer) gl.deleteBuffer(this.instanceBuffer);
+    if (this.texture) gl.deleteTexture(this.texture);
   }
 
   /* ------------------------------------------------------------------ */
@@ -335,6 +319,14 @@ export class EntityLayer implements CustomLayerInterface {
     // not the map's raw matrix. The raw matrix expects absolute world positions;
     // we send small offsets, so the two must not be mixed.
     gl.uniformMatrix4fv(this.matrixLocation, false, this.matrix32);
+
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, this.texture);
+    gl.uniform1i(this.sheetLocation, 0);
+    if (this.atlas) {
+      gl.uniform2f(this.cellSizeLocation, this.atlas.cellU, this.atlas.cellV);
+      gl.uniform1f(this.columnsLocation, this.atlas.columns);
+    }
 
     gl.bindBuffer(gl.ARRAY_BUFFER, this.instanceBuffer);
     // Upload only the part we actually filled, not the whole pool.
@@ -430,7 +422,11 @@ export class EntityLayer implements CustomLayerInterface {
       this.instanceBytes[colourByteOffset + 2] = store.colour[c + 2];
       this.instanceBytes[colourByteOffset + 3] = store.colour[c + 3];
 
-      data[offset + 4] = SHAPE_FOR_KIND[store.kind[id]] ?? 0;
+      const kind = store.kind[id];
+      data[offset + 4] =
+        kind === EntityKind.MONSTER
+          ? Math.min(store.variant[id], MONSTER_SPRITE_COUNT - 1)
+          : (SPRITE_FOR_KIND[kind] ?? SpriteIndex.SWARMER);
       data[offset + 5] = Math.min(1, store.hitFlash[id] * 8);
 
       written++;

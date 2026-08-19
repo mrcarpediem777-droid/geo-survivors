@@ -96,6 +96,9 @@ export class Combat {
   /** Contact damage gathered this frame, before the cap is applied. */
   private contactDamageThisFrame = 0;
 
+  /** Money picked up this run, waiting to be banked. */
+  coinsCollected = 0;
+
   /* --- crowding grid, so monsters spread out instead of stacking --- */
   private crowdHeads = new Int32Array(CROWD_GRID_SIZE * CROWD_GRID_SIZE).fill(-1);
   private crowdNext: Int32Array;
@@ -266,6 +269,7 @@ export class Combat {
     this.runTimeSeconds = 0;
     this.monstersKilled = 0;
     this.livingMonsters = 0;
+    this.coinsCollected = 0;
     this.awaitingCardChoice = false;
     this.pendingLevelUps = 0;
     this.dead = false;
@@ -1038,10 +1042,20 @@ export class Combat {
 
     if (dropXp) {
       this.monstersKilled++;
-      const orb = this.entities.spawn(EntityKind.XP_ORB, store.lng[id], store.lat[id], 1.1);
+
+      const orb = this.entities.spawn(EntityKind.XP_ORB, store.lng[id], store.lat[id], 1.3);
       if (orb >= 0) {
         this.entities.value[orb] = store.value[id];
-        this.entities.lifetime[orb] = 45;
+        this.entities.lifetime[orb] = TUNING.player.lootLifetimeSeconds;
+      }
+
+      // Money is rarer than experience, and buys things that outlast the run.
+      if (this.random() < TUNING.player.coinDropChance) {
+        const coin = this.entities.spawn(EntityKind.COIN, store.lng[id], store.lat[id], 1.3);
+        if (coin >= 0) {
+          this.entities.value[coin] = TUNING.player.coinValue;
+          this.entities.lifetime[coin] = TUNING.player.lootLifetimeSeconds;
+        }
       }
     }
 
@@ -1065,12 +1079,22 @@ export class Combat {
     }
   }
 
+  /**
+   * Loot lies where it fell and is collected by walking over it.
+   *
+   * It used to drift toward the player, which made collecting automatic. By
+   * request it no longer does: you go and get it, exactly as in the game this
+   * borrows from. Since walking is now the only way to move, this quietly makes
+   * a run's reward depend on covering ground rather than standing well.
+   */
   private updateOrbs(deltaSeconds: number, playerX: number, playerY: number): void {
     const store = this.entities;
     const pickupRadius = TUNING.player.pickupRadiusMetres * this.loadout.pickupRadiusMultiplier;
 
     for (let id = 0; id < store.usedSlots; id++) {
-      if (!store.alive[id] || store.kind[id] !== EntityKind.XP_ORB) continue;
+      if (!store.alive[id]) continue;
+      const kind = store.kind[id];
+      if (kind !== EntityKind.XP_ORB && kind !== EntityKind.COIN) continue;
 
       store.lifetime[id] -= deltaSeconds;
       if (store.lifetime[id] <= 0) {
@@ -1084,27 +1108,19 @@ export class Combat {
       const dy = playerY - y;
       const distance = Math.hypot(dx, dy);
 
-      if (distance < 2.5) {
-        this.gainXp(store.value[id]);
+      // Loot no longer comes to you. Walk over it, or leave it lying there.
+      //
+      // This reverses an earlier decision, and the reason is worth keeping: back
+      // when the character was on a 28 m rope it genuinely could not reach most
+      // of what it killed, so experience had to fly in or runs produced no
+      // levels at all. Without the rope you are free to walk anywhere, so
+      // collecting is once again something you do rather than something that
+      // happens to you -- which is how the game this borrows from works.
+      if (distance < pickupRadius) {
+        if (kind === EntityKind.COIN) this.coinsCollected += store.value[id];
+        else this.gainXp(store.value[id]);
         store.release(id);
-        continue;
       }
-
-      // Orbs ALWAYS drift toward you, quickly once close and slowly from afar.
-      //
-      // The obvious version -- only attract within the pickup radius -- loses
-      // most of the game's experience, and it took a simulated run to notice:
-      // weapons kill out to 42 m, orbs were only collected within 14 m, and the
-      // player is leashed to 28 m. Three minutes of fighting produced 36 kills
-      // and not one level. Everything died just out of reach and rotted there.
-      //
-      // Since the player is on a leash and cannot simply wander over to collect
-      // things, the experience has to come to them.
-      const closeEnoughToRush = distance < pickupRadius;
-      const pull =
-        TUNING.player.pickupSpeedMps * (closeEnoughToRush ? 1 : 0.22) * deltaSeconds;
-      store.lng[id] = this.collision.toLng(x + (dx / distance) * pull);
-      store.lat[id] = this.collision.toLat(y + (dy / distance) * pull);
     }
   }
 
