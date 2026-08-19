@@ -386,10 +386,40 @@ export const TUNING = {
      * arrive. The brief is explicit that opening the app should never be boring,
      * so the opening wave starts partway along the journey instead of at the
      * nest. They still come from the nests -- they simply set off earlier.
+     *
+     * Brought closer a second time. Confining monsters to roads made them walk
+     * further than the straight line, and from 34-62 m the first one still took
+     * about a minute to arrive -- which is a minute of looking at an empty
+     * street. From 16-34 m the fight starts in the first ten seconds.
      */
-    openingWaveCount: 7,
-    openingWaveMinMetres: 34,
-    openingWaveMaxMetres: 62,
+    openingWaveCount: 12,
+    /**
+     * For this long after a run starts, monsters from a nest appear partway
+     * along their journey rather than at the nest itself.
+     *
+     * Without it there is an opening wave, it dies, and then a measured 55
+     * seconds of nothing while the real ones walk over -- monsters are slower
+     * than a person by design and now go the long way round by road, so the
+     * first proper wave is a minute out however the nests are placed. This
+     * bridges that gap and then gets out of the way.
+     */
+    warmupSeconds: 75,
+    /**
+     * How far out the warm-up reinforcements appear.
+     *
+     * Pushed back from 26-48 m: at that distance every awake nest was dropping
+     * monsters on the player's head and a run ended at 60 seconds on level one.
+     * They should shorten the walk, not skip it.
+     */
+    warmupMinMetres: 42,
+    warmupMaxMetres: 70,
+    /**
+     * What share of early spawns take the short cut. The rest set off from the
+     * nest properly, so the stream keeps building behind the first arrivals.
+     */
+    warmupShare: 0.45,
+    openingWaveMinMetres: 16,
+    openingWaveMaxMetres: 34,
 
     /**
      * A nest will not have more than this many of its monsters alive at once.

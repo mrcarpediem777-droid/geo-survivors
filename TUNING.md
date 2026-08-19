@@ -294,6 +294,21 @@ than an old one. If they ever start deciding runs, shrink them.
 | `streetHalfWidthMetres` | 2.5 | How wide a road counts as. |
 | `countPerCell` | 12 | Nests scattered across the neighbourhood. |
 | `activateWithinMetres` | 190 | How close you must be before a nest wakes up. |
+| `openingWaveCount` | 12 | Monsters already on their way when a run starts. |
+| `warmupSeconds` | 75 | How long early spawns take a short cut toward you. |
+| `warmupShare` | 0.45 | What fraction of them take it. |
+
+**The opening is the fiddliest part of the whole game, because monsters must stay slower
+than a walking person and now go the long way round by road.** Three measured attempts:
+
+| Setting | Result |
+|---|---|
+| Opening wave at 34–62 m | first arrivals took **a minute** — an empty street |
+| Every early spawn at 26–48 m | dead at **60 s** on level one — reinforcements on your head |
+| Now: 16–34 m, then 45% at 42–70 m | fight from second zero, longest gap **16 s**, death at 112 s |
+
+- **The start feels empty** → *raise* `openingWaveCount`, or *lower* `warmupMinMetres`
+- **The start is overwhelming** → *lower* `warmupShare` toward 0.25
 | `hitFlashSeconds` | 0.12 | How long a monster flashes white when hit. |
 
 **Measured with roads-only on:** roads cover 45% of the ground and **82% of monsters are
