@@ -445,6 +445,16 @@ export const TUNING = {
      */
     healthRegenPerSecond: 0.45,
     /**
+     * The most a crowd can take off you per second, however many are touching.
+     *
+     * Being surrounded should feel like drowning, not like a switch. Without
+     * this, the instant the swarm broke through, sixty monsters at once emptied
+     * a full health bar in under a second.
+     *   LOWER  = you can wade through a crowd; being surrounded stops mattering.
+     *   HIGHER = the moment they reach you is the moment you die.
+     */
+    maxContactDamagePerSecond: 42,
+    /**
      * Seconds of protection after being hit, so a crowd cannot delete you.
      * Shortened from 0.55 for the same reason: standing inside a swarm should
      * cost something.

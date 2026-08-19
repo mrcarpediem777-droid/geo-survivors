@@ -91,6 +91,9 @@ export class Combat {
   /** Running count, kept up to date on spawn and death so nothing has to scan. */
   private livingMonsters = 0;
 
+  /** Contact damage gathered this frame, before the cap is applied. */
+  private contactDamageThisFrame = 0;
+
   /* --- crowding grid, so monsters spread out instead of stacking --- */
   private crowdHeads = new Int32Array(CROWD_GRID_SIZE * CROWD_GRID_SIZE).fill(-1);
   private crowdNext: Int32Array;
@@ -281,6 +284,18 @@ export class Combat {
     this.updateNests(deltaSeconds);
     this.rebuildCrowdGrid();
     this.updateMonsters(deltaSeconds, playerX, playerY);
+
+    // Apply the whole frame's crowding at once, capped.
+    //
+    // Uncapped, the moment the swarm broke through, sixty monsters touching at
+    // the same instant removed a full health bar in under a second -- measured:
+    // untouched at 386 s, dead at 393 s. That is a light switch, not a fight.
+    // Capping it turns being overwhelmed into something you can feel arriving,
+    // and gives you a few seconds to decide to walk away.
+    if (this.contactDamageThisFrame > 0) {
+      const cap = TUNING.player.maxContactDamagePerSecond * deltaSeconds;
+      this.damagePlayer(Math.min(this.contactDamageThisFrame, cap));
+    }
     this.fireWeapons(deltaSeconds, playerX, playerY);
     this.updateProjectiles(deltaSeconds);
     this.updateOrbs(deltaSeconds, playerX, playerY);
@@ -516,6 +531,7 @@ export class Combat {
   private updateMonsters(deltaSeconds: number, playerX: number, playerY: number): void {
     const store = this.entities;
     const types = TUNING.monsters.types;
+    this.contactDamageThisFrame = 0;
 
     for (let id = 0; id < store.usedSlots; id++) {
       if (!store.alive[id] || store.kind[id] !== EntityKind.MONSTER) continue;
@@ -617,7 +633,10 @@ export class Combat {
       if (store.damage[id] > 0) {
         const touchDistance = store.radiusMetres[id] + 2.2;
         if (Math.hypot(playerX - nextX, playerY - nextY) < touchDistance) {
-          this.damagePlayer(store.damage[id] * deltaSeconds);
+          // Gathered up and capped below, rather than applied one monster at a
+          // time. Sixty of them touching at once is a swarm closing in, not
+          // sixty separate accidents.
+          this.contactDamageThisFrame += store.damage[id] * deltaSeconds;
         }
       }
     }
@@ -800,7 +819,8 @@ export class Combat {
       const angle = spin + (i / blades) * Math.PI * 2;
       const bx = playerX + Math.cos(angle) * orbitRadius;
       const by = playerY + Math.sin(angle) * orbitRadius;
-      this.damageMonstersAround(bx, by, bladeRadius, damage);
+      // One blade, one victim at a time. More blades is what levelling buys.
+      this.damageMonstersAround(bx, by, bladeRadius, damage, 1);
     }
   }
 
@@ -808,19 +828,40 @@ export class Combat {
   private firePulse(level: number, playerX: number, playerY: number): void {
     const radius = Math.min((14 + level * 3) * this.loadout.rangeMultiplier, TUNING.weapons.maxRangeMetres);
     const damage = TUNING.weapons.startingBoltDamage * (1.1 + level * 0.4) * this.loadout.damageMultiplier;
-    this.damageMonstersAround(playerX, playerY, radius, damage);
+    // A shockwave clears a crowd, not an army. Levelling widens both.
+    this.damageMonstersAround(playerX, playerY, radius, damage, 6 + level * 4);
   }
 
-  private damageMonstersAround(x: number, y: number, radius: number, damage: number): void {
+  /**
+   * Hurt monsters near a point, but only so many of them.
+   *
+   * THE TARGET LIMIT IS THE WHOLE POINT. Without it an area weapon hits
+   * everything inside its radius at once, so its total damage grows with the
+   * size of the crowd -- which makes it a perfect wall. Measured: a ring of
+   * monsters formed at 12-15 m and never closed, however many arrived, and a
+   * standing player simply could not be killed.
+   *
+   * A weapon that can only strike a handful of things at a time can be
+   * overwhelmed by numbers, which is exactly what a swarm is for.
+   */
+  private damageMonstersAround(
+    x: number,
+    y: number,
+    radius: number,
+    damage: number,
+    maxTargets: number
+  ): void {
     const store = this.entities;
     const radiusSquared = radius * radius;
+    let hit = 0;
 
-    for (let id = 0; id < store.usedSlots; id++) {
+    for (let id = 0; id < store.usedSlots && hit < maxTargets; id++) {
       if (!store.alive[id] || store.kind[id] !== EntityKind.MONSTER) continue;
       const dx = this.collision.toLocalX(store.lng[id]) - x;
       const dy = this.collision.toLocalY(store.lat[id]) - y;
       if (dx * dx + dy * dy > radiusSquared) continue;
       this.hurtMonster(id, damage);
+      hit++;
     }
   }
 
