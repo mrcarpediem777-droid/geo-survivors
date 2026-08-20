@@ -542,7 +542,7 @@ Buying *everything in the game* — a full set plus every permanent upgrade maxe
 run about a third longer (99 s → 131 s standing still). That is the intended band. It
 widens the door; it does not walk through it for you.
 
-### Four things that were quietly broken, and one that still is
+### Five things that were quietly broken
 
 **Two permanent upgrades and two level-up cards did literally nothing.** "Reach" and
 "Long Rope" added metres to the leash; "Haste" and "Light Feet" made you walk faster on
@@ -558,31 +558,77 @@ double damage) and monsters queue along a street (so one piercing shot hits the 
 It was cut. Extra shots and piercing remain level-up cards, earned in a run and lost with
 it.
 
-**Defence is worth about one second, and that is not the items' fault.** Measured
+**Defence was worth about one second, and that was not the items' fault.** Measured
 standing still, +60 health bought one second of life. So did 15% armour, and so did
-healing three points a second. Pushing the numbers far higher barely moved them. The
-reason showed up in a trace of a whole run:
+healing three points a second. Pushing the numbers far higher barely moved them. A trace
+of a whole run showed why:
 
 ```
  0s  hp 200   12 monsters   nearest 17 m
 30s  hp 200   52 monsters   nearest 33 m
 60s  hp 200   98 monsters   nearest 19 m
-80s  hp 200  128 monsters   nearest 11 m
-90s  hp 200  143 monsters   nearest  4 m   <- nine arrive at once
+90s  hp 200  143 monsters   nearest  4 m
 97s  dead
 ```
 
-Health is untouched for ninety seconds and then gone in five. The swarm spends the run
-walking towards you doing no damage whatsoever, and the moment it lands it hits the cap
-of 42 damage a second, which empties the bar in 4.8. **There is no middle.** Nothing that
-protects you can matter, because there is nothing to be protected from until it is
-already too late — and this applies to the Vitality and Thick Skin cards, and to the
-Bruiser's whole identity, exactly as much as to the armour slot.
+Not one monster touched the player in ninety-nine seconds. Health sat full the whole way
+and then the entire bar went inside the last nine. **There was no middle.** Nothing
+protective could matter, because there was nothing to be protected from until it was
+already too late — and the player never got the one warning this game exists to give:
+*you are at half health, walk away.*
 
-This one is left **unfixed on purpose**. Fixing it means letting the closing crowd hurt
-you gradually, so health becomes something spent across a run rather than a wall at the
-end of it. That changes how the game feels, and how it feels was signed off already, so
-it is a decision to be made deliberately rather than a number to nudge on the quiet.
+### Fixing it took three changes, and two of them alone did nothing
+
+**The crowd now presses on you as it closes.** Anything nearer than 20 m hurts a little,
+more the closer it is, capped low. On its own this changed almost nothing — widening the
+radius found nothing to press with, because at that point in a run there was nobody near.
+
+**So reinforcements were moved closer**, from 42–70 m to 24–46 m. At the old distance, by
+road and at a monster's pace, the first ones took a full minute to walk in. Two thirds of
+every run was a flat line simply because the map was empty around you.
+
+**And monsters turned out to be faster than a walking human.** The swarmer moved at
+1.30 m/s and the stalker at 1.35, against an ordinary walking pace of about 1.3. The
+brief requires them to be *clearly* slower so that a player can always walk away — and
+measured, they could not: fleeing a crowd on foot lost health the whole way and still
+ended in death. This had been true for a long time and was invisible, because nothing
+ever touched you until the last few seconds, so walking away was never worth trying. The
+moment the crowd could press on you, the broken escape route mattered.
+
+The run now looks like this standing still, and 120 of the 200 points of health are taken
+gradually against 84 by the swarm actually landing on you — it used to be nought and two
+hundred:
+
+```
+  0s 100%   15s 99%   30s 93%   45s 91%   60s 89%   75s 73%   90s 47%   dead at 106 s
+```
+
+And walking away from the crowd at 70% health now works, which is the whole point:
+
+```
+survived the full 240 s, walked 168 m, dipped to 54%, recovered to 89%
+```
+
+**Healing had to be reined in separately.** Healing 2.2 a second was worth six extra
+seconds; healing 3.0 a second was worth seventy-seven, because the squeeze from a closing
+crowd is a couple of points a second and anything faster than that cancelled it outright.
+A cliff that steep is not something to balance on — a Field Kit plus the Mending upgrade
+plus a few Second Wind cards would step straight over it. Healing now pauses while
+something is hurting you, so it is the reward for breaking away rather than a way to
+ignore the crowd.
+
+**And a maxed-out player has to stay beatable.** With every permanent upgrade bought,
+weapons reach 34 m while the crowd only begins to press at 20, so nothing reached that
+player at all — they stood at full health after two and a half minutes. Nests now reach
+full fury in 150 seconds instead of 240, which brings them down to 28% by 110 seconds
+while leaving a player who owns nothing dying at 106, exactly as before. At the peak of
+that run: 217 monsters, median frame 1.70 ms, 99th percentile 7.3 ms of the 16.7 ms
+budget.
+
+Standing still, +60 health is now worth three seconds rather than one. That is still
+deliberately small: standing still is not a strategy this game supports. The armour slot
+is what lets you disengage and come back — the 240-second survival above is what a Padded
+Jacket and a Field Kit are actually for.
 
 ---
 

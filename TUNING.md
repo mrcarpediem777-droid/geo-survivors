@@ -305,14 +305,12 @@ cards taken, so the numbers are low across the board but comparable):
 
 | Worn | Survived | Killed |
 |---|---|---|
-| nothing | 99 s | 40 |
-| Balanced Rig | 115 s | 54 |
-| Hair Trigger | 107 s | 45 |
-| Rig + Plates + Lens | 116 s | 54 |
-| a full set **and** every permanent upgrade maxed | 131 s | 61 |
+| nothing | 90 s | 35 |
+| Balanced Rig | 92 s | 36 |
+| Rig + Plates + Lens | 97 s | 40 |
 
-Buying literally everything in the game makes a run about a third longer. That is the
-band these are meant to sit in — wide enough to feel, nowhere near enough to win for you.
+Wide enough to feel, nowhere near enough to win for you. Re-measure these after any change
+to the numbers below — they moved once already when the damage curve was fixed.
 
 **One item had to be thrown out.** A "Splitter" giving +1 projectile and +1 pierce turned
 a run that died at 97 seconds into one still at full health after 240. Either half did it
@@ -321,34 +319,100 @@ queue along a street, so a piercing shot hits the whole queue. Extra shots and p
 stay as level-up cards, earned inside a run and lost with it. A permanent purchase that
 makes the game unlosable is not an upgrade, it is an off switch.
 
-### The armour slot is currently worth about one second — and why
+### The flat line and the wall, and how it was fixed
 
-Measured, standing still: +60 health bought **1 second**. So did 15% armour. So did
-healing 3 points a second. Pushing them further barely helped — +100 health, 25% armour
-and 8 health a second each bought one or two seconds.
-
-That is not a fault in the items. It is the shape of the fight. Sampling a run every ten
+The armour slot used to be worth about **one second**. +60 health bought one. So did
+15% armour, and so did healing three points a second. Pushing the numbers further barely
+helped. That was not the items' fault — it was the shape of the fight. Sampled every ten
 seconds:
 
 ```
  0s  hp 200   12 monsters   nearest 17 m
 30s  hp 200   52 monsters   nearest 33 m
 60s  hp 200   98 monsters   nearest 19 m
-80s  hp 200  128 monsters   nearest 11 m
-90s  hp 200  143 monsters   nearest  4 m   <- nine of them arrive at once
+90s  hp 200  143 monsters   nearest  4 m
 97s  dead
 ```
 
-**Your health is untouched for ninety seconds and then gone in five.** The swarm spends
-the whole run walking to you doing no damage at all, and the moment it arrives it hits
-the damage cap of 42 a second, which empties a 200-point health bar in 4.8 seconds. There
-is no middle. Nothing that protects you can matter, because there is nothing to protect
-you *from* until the instant it is already too late — and that applies to the Vitality
-and Thick Skin cards and to the Bruiser character just as much as to this slot.
+Not one monster touched the player in ninety-nine seconds. Health read full at every
+sample and then the whole bar went inside the last nine. Nothing protective could matter,
+because there was nothing to be protected from until it was already over — and the player
+never got the one warning this game wants to give: *you are at half health, walk away.*
 
-Fixing it means letting the crowd hurt you *gradually* as it closes, so health becomes
-something you spend all run instead of a wall you hit at the end. That changes how the
-game feels, so it is a decision to make deliberately rather than a number to nudge.
+**Three things were changed together.** Each is a number here, and each was necessary;
+the first two alone did almost nothing.
+
+**1. The crowd presses on you as it closes** — `player.crowdPressure`. Anything nearer
+than 20 m hurts a little, more the closer it is, capped at 3.5 a second however thick the
+crowd. The cap is sensitive: at 7 a second the crowd simply held the ceiling from fifty
+seconds in, which is a slower wall, not a bleed.
+
+**2. Reinforcements arrive early enough to be the slope** — `nests.warmupMinMetres` /
+`warmupMaxMetres`, moved from 42–70 m to 24–46 m. At 42–70 m, by road and at a monster's
+pace, the first ones took a full minute to walk in, so widening the pressure radius found
+nothing to press with.
+
+**3. Monsters were slowed** — see `monsters.types`. This one is a safety rule, not
+balance. See below.
+
+The result, standing still on the same street:
+
+```
+  0s 100%   15s 99%   30s 93%   45s 91%   60s 89%   75s 73%   90s 47%   dead at 106 s
+```
+
+Of 200 points of health, **120 are now taken gradually and 84 by the swarm actually
+landing on you** in the last few seconds. It used to be nought and two hundred.
+
+### Monsters were faster than a walking human
+
+The swarmer moved at 1.30 m/s and the stalker at 1.35. An ordinary walking pace is about
+1.3. The brief requires monsters to be *clearly* slower than a walking human **so that a
+player can always walk away** — and measured, they could not: fleeing a crowd on foot
+lost health the entire way and still ended in death at 106 s.
+
+This had been true for a long time and was invisible, because nothing ever touched you
+until the last few seconds, so walking away was never worth trying. The moment the crowd
+could press on you, the broken escape route mattered.
+
+Speeds are now 0.95 (swarmer), 0.6 (brute), 0.8 (spitter), 1.05 (stalker). **Nothing here
+may go above about 1.05.** With them, walking away from the crowd at 70% health:
+
+```
+survived the full 240 s, walked 168 m, dipped to 54%, recovered to 89%
+```
+
+### Healing pauses while something is hurting you
+
+`player.regenPausedAfterHurtSeconds`. Healing 2.2 a second was worth six extra seconds of
+life; healing 3.0 a second was worth **seventy-seven** — because the squeeze from a
+closing crowd is a couple of points a second, so anything healing faster than that made
+the middle of a run free. A cliff that steep between 2.2 and 3.0 is not something to
+balance on, and stacking a Field Kit with the Mending upgrade and a few Second Wind cards
+walks straight over it.
+
+So healing now happens when nothing is pressing on you. That is also the behaviour this
+game wants: breaking away from a swarm is always allowed, always works, and now pays.
+
+### And a maxed-out player must still be beatable
+
+With every permanent upgrade bought, weapons reach 34 m while the crowd only starts to
+press at 20 — so nothing ever reached that player at all, and they sat at **full health
+after two and a half minutes** standing still. That is the immortal perimeter this file
+warns about under `maxAlivePerNest`, and the remedy it prescribes is numbers, not speed:
+`nests.escalationOverSeconds` went from 240 to 150. The same player is now at 28% by 110
+seconds, while a player with nothing dies at 106 as before — early nests are nowhere near
+full fury yet, so the weak end is untouched.
+
+Cost in frames, at the peak of that run: **217 monsters, median 1.70 ms and 99th
+percentile 7.3 ms** of the 16.7 ms budget.
+
+### What defence is worth now
+
+Standing still, +60 health buys **three** seconds rather than one. That is still not much,
+and it is meant not to be: standing still is not a strategy this game supports. The armour
+slot is what lets you disengage and come back — the 240-second survival above is what a
+Padded Jacket and a Field Kit are actually for.
 
 ---
 

@@ -241,12 +241,24 @@ export const TUNING = {
      * nowhere to stand. Pressure comes from numbers and encirclement, not speed.
      *
      * If combat ever feels toothless, raise their NUMBERS, not their speed.
+     *
+     * SPEEDS WERE CUT ONCE MORE, and this one is a safety rule rather than a
+     * balance choice. The swarmer used to move at 1.30 m/s and the stalker at
+     * 1.35, against an ordinary walking pace of about 1.3. The brief says
+     * monsters must be CLEARLY slower than a walking human so that a player can
+     * always walk away -- and measured, they could not: fleeing a crowd on foot
+     * lost health the entire way and still ended in death.
+     *
+     * It went unnoticed because nothing ever touched the player until the last
+     * few seconds of a run, so walking away was never worth trying. The moment
+     * the crowd could press on you, the broken escape route mattered. Nothing
+     * here may go above about 1.05 m/s.
      */
     types: [
       {
         name: 'swarmer',
         /** Fast, weak, arrives in crowds. The bread and butter. */
-        speedMps: 1.3,
+        speedMps: 0.95,
         health: 26,
         damagePerSecond: 6,
         radiusMetres: 1.6,
@@ -257,7 +269,7 @@ export const TUNING = {
       {
         name: 'brute',
         /** Slow and tough. Blocks alleys and soaks damage. */
-        speedMps: 0.75,
+        speedMps: 0.6,
         health: 120,
         damagePerSecond: 13,
         radiusMetres: 2.8,
@@ -272,7 +284,7 @@ export const TUNING = {
          * buildings, so ducking behind a house genuinely saves you -- this is
          * the type that makes the map matter tactically.
          */
-        speedMps: 1.0,
+        speedMps: 0.8,
         health: 18,
         damagePerSecond: 0,
         radiusMetres: 1.8,
@@ -300,7 +312,7 @@ export const TUNING = {
          * rather than at range -- so the pressure still varies, but nothing
          * shoots at you.
          */
-        speedMps: 1.35,
+        speedMps: 1.05,
         health: 50,
         damagePerSecond: 9,
         radiusMetres: 2.0,
@@ -375,8 +387,17 @@ export const TUNING = {
      * How long a nest takes to reach full fury, in seconds.
      *   SHORTER = pressure escalates alarmingly; a nest is an emergency.
      *   LONGER  = you can safely ignore a nest for a while.
+     *
+     * Shortened from 240 to pay for the slower monsters. With everything in the
+     * game bought and the player standing still, a maxed loadout kills at 34 m
+     * while the crowd only starts to press at 20 -- so nothing ever reached
+     * them, and at 240 they sat at FULL HEALTH after two and a half minutes.
+     * That is the immortal perimeter this file warns about further up, and the
+     * remedy it prescribes is numbers rather than speed. At 150 the same player
+     * is down to 56% by 110 s, while a player with nothing still dies at 89 --
+     * unchanged, because early nests are nowhere near full fury yet.
      */
-    escalationOverSeconds: 240,
+    escalationOverSeconds: 150,
     /**
      * How many monsters are already on their way when a run begins, and how far
      * out they start.
@@ -407,12 +428,17 @@ export const TUNING = {
     /**
      * How far out the warm-up reinforcements appear.
      *
-     * Pushed back from 26-48 m: at that distance every awake nest was dropping
-     * monsters on the player's head and a run ended at 60 seconds on level one.
-     * They should shorten the walk, not skip it.
+     * Pushed back to 42-70 m once, because at 26-48 m every awake nest was
+     * dropping monsters on the player's head and a run ended at 60 seconds on
+     * level one. Brought forward again to 24-46 m now that the crowd presses on
+     * you gradually instead of arriving all at once: at 42-70 m, by road and at
+     * a monster's pace, the first reinforcements took SIXTY SECONDS to walk in,
+     * so two thirds of every run was a flat line with nothing near you. The
+     * thing that made 26-48 m brutal -- monsters landing on you intact -- is
+     * also what the slower speeds and the pressure curve now handle.
      */
-    warmupMinMetres: 42,
-    warmupMaxMetres: 70,
+    warmupMinMetres: 24,
+    warmupMaxMetres: 46,
     /**
      * What share of early spawns take the short cut. The rest set off from the
      * nest properly, so the stream keeps building behind the first arrivals.
@@ -495,6 +521,24 @@ export const TUNING = {
      */
     healthRegenPerSecond: 0.45,
     /**
+     * Healing stops for this long after anything hurts you.
+     *
+     * Without it, healing simply cancelled the crowd. Measured: healing 2.2 a
+     * second was worth six extra seconds of life, and 3.0 a second was worth
+     * SEVENTY-SEVEN -- because the squeeze from a closing crowd is a couple of
+     * points a second, so anything healing faster than that made the whole
+     * middle of a run free. A cliff like that between 2.2 and 3.0 is not
+     * something to balance on; stacking a Field Kit with the Mending upgrade and
+     * a few Second Wind cards would walk straight over it.
+     *
+     * So healing is now something that happens when you are NOT being pressed --
+     * which is the behaviour this game wants anyway. Walking away from a swarm
+     * is always allowed and always works, and this makes it pay.
+     *   ZERO   = healing cancels the crowd again.
+     *   LONGER = you must properly break away before you recover.
+     */
+    regenPausedAfterHurtSeconds: 4,
+    /**
      * The most a crowd can take off you per second, however many are touching.
      *
      * Being surrounded should feel like drowning, not like a switch. Without
@@ -504,6 +548,44 @@ export const TUNING = {
      *   HIGHER = the moment they reach you is the moment you die.
      */
     maxContactDamagePerSecond: 42,
+    /**
+     * THE CROWD PRESSING IN, before it actually reaches you.
+     *
+     * Measured on a Da Nang street, standing still: across a 99-second run NOT
+     * ONE monster ever touched the player. Health read 200 of 200 at every
+     * ten-second sample right up to the end, and then the whole bar vanished
+     * inside the last nine seconds. The run was a flat line and then a wall.
+     *
+     * That shape made every defensive number in the game worthless -- +60 health
+     * bought ONE second, and so did 15% armour, and so did healing three points
+     * a second. Not because the numbers were small, but because there was
+     * nothing to defend against until it was already over. It also meant the
+     * player got no warning: no moment of "I am at half health, time to walk
+     * away", which is the one decision this game actually wants you to make.
+     *
+     * So monsters now press on you as they close, not only when they land on
+     * you. Anything nearer than this hurts a little, more the closer it is.
+     * Health becomes something spent across a run instead of a cliff at the end.
+     *   ZERO   = back to the flat line and the wall.
+     *   HIGHER radius = you feel the swarm from further off.
+     *   HIGHER share  = closing in hurts more relative to being caught.
+     */
+    crowdPressure: {
+      /** How far away a monster can still press on you, in metres. */
+      radiusMetres: 20,
+      /** At point-blank, what fraction of its bite the pressure is worth. */
+      share: 0.2,
+      /**
+       * However thick the crowd, pressure alone can never exceed this.
+       *
+       * Sized by measurement, and it is sensitive. At 7 a second the crowd held
+       * the ceiling continuously from about fifty seconds in, which is not a
+       * bleed, it is a slower wall. At 3.5 health drifts down all run -- 100%,
+       * 96% at thirty seconds, 91% at a minute -- and only steepens once the
+       * swarm is genuinely on top of you.
+       */
+      maxPerSecond: 3.5,
+    },
     /**
      * Seconds of protection after being hit, so a crowd cannot delete you.
      * Shortened from 0.55 for the same reason: standing inside a swarm should
