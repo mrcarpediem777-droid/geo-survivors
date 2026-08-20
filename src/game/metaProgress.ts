@@ -18,8 +18,12 @@
  * which cards you pick this run -- would stop mattering. These are meant to widen
  * the door, not to walk through it for you.
  *
- * WHERE THE ESSENCE COMES FROM: clearing a nest, which can only be done on foot.
- * So permanent progress is paid for in footsteps, exactly as the brief requires.
+ * WHERE THE ESSENCE COMES FROM: clearing a nest, which can only be done on foot,
+ * and loose change off dead monsters. So permanent progress is paid for in
+ * footsteps, exactly as the brief requires.
+ *
+ * The other coin sink is EQUIPMENT, in `equipment.ts`. These upgrades are the
+ * slow, always-on floor; equipment is the shape of a particular loadout.
  */
 
 export interface MetaUpgrade {
@@ -50,10 +54,16 @@ export const META_UPGRADES: MetaUpgrade[] = [
     maxLevel: 10,
     costAt: (level) => 70 + level * level * 18,
   },
+  /*
+   * "Reach" used to add rope to the leash and "Haste" used to make the
+   * character walk faster on the thumbstick. Both stopped meaning anything the
+   * day the thumbstick was removed, and they went on charging coins for it.
+   * Same names where the name still fits, real effects underneath.
+   */
   {
     id: 'reach',
     title: 'Reach',
-    description: '+2 metres of rope per level. More room to move without walking.',
+    description: '+5% weapon range per level. You start hitting things sooner.',
     glyph: '⌒',
     maxLevel: 6,
     costAt: (level) => 90 + level * level * 30,
@@ -68,9 +78,9 @@ export const META_UPGRADES: MetaUpgrade[] = [
   },
   {
     id: 'haste',
-    title: 'Haste',
-    description: '+5% movement per level.',
-    glyph: '»',
+    title: 'Mending',
+    description: '+0.3 health healed per second, per level.',
+    glyph: '♡',
     maxLevel: 6,
     costAt: (level) => 85 + level * level * 26,
   },
@@ -101,9 +111,9 @@ export function costToBuy(upgrade: MetaUpgrade, levels: MetaLevels): number | nu
 export interface MetaBonuses {
   bonusHealth: number;
   damageMultiplier: number;
-  bonusLeashMetres: number;
+  rangeMultiplier: number;
   pickupMultiplier: number;
-  moveMultiplier: number;
+  regenBonus: number;
   captureSpeedMultiplier: number;
 }
 
@@ -111,9 +121,9 @@ export function bonusesFrom(levels: MetaLevels): MetaBonuses {
   return {
     bonusHealth: metaLevel(levels, 'vigour') * 12,
     damageMultiplier: 1 + metaLevel(levels, 'edge') * 0.06,
-    bonusLeashMetres: metaLevel(levels, 'reach') * 2,
+    rangeMultiplier: 1 + metaLevel(levels, 'reach') * 0.05,
     pickupMultiplier: 1 + metaLevel(levels, 'greed') * 0.2,
-    moveMultiplier: 1 + metaLevel(levels, 'haste') * 0.05,
+    regenBonus: metaLevel(levels, 'haste') * 0.3,
     captureSpeedMultiplier: 1 + metaLevel(levels, 'resolve') * 0.08,
   };
 }

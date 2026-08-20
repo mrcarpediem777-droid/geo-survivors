@@ -54,10 +54,14 @@ export interface ProfileData {
   unlockedCharacters: string[];
   /** Which one is being played. */
   selectedCharacter: string;
+  /** Every piece of equipment bought so far, by id. */
+  ownedEquipment: string[];
+  /** Which item is worn in each of the three slots. Empty means nothing. */
+  equippedBySlot: Record<string, string>;
 }
 
 const STORAGE_KEY = 'geo-survivors.profile';
-const CURRENT_VERSION = 4;
+const CURRENT_VERSION = 5;
 
 function freshProfile(): ProfileData {
   return {
@@ -75,6 +79,8 @@ function freshProfile(): ProfileData {
     bestLevel: 1,
     unlockedCharacters: ['wanderer'],
     selectedCharacter: 'wanderer',
+    ownedEquipment: [],
+    equippedBySlot: {},
   };
 }
 
@@ -122,6 +128,10 @@ export class Profile {
           // simply starts with the free one.
           unlockedCharacters: parsed.unlockedCharacters ?? ['wanderer'],
           selectedCharacter: parsed.selectedCharacter ?? 'wanderer',
+          // Version 5 adds equipment. Nobody owns any yet, which is correct --
+          // it has never been on sale before.
+          ownedEquipment: parsed.ownedEquipment ?? [],
+          equippedBySlot: parsed.equippedBySlot ?? {},
         };
       }
 

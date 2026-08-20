@@ -546,6 +546,63 @@ mode** toggle that reduces monster counts and map redraws. Until then:
 
 ---
 
+## Spending coins: equipment
+
+The shop now sells **eleven pieces of equipment** as well as the five characters and the
+six permanent upgrades. Three slots — weapon, armour, charm — and **one item worn in
+each**, so a full set is a combination rather than a purchase. Tap to buy, tap again to
+take it off, tap another in the same slot to swap. Everything is kept forever and nothing
+is consumable: running out of something halfway through a walk, far from home, is exactly
+the kind of pressure this game refuses to create.
+
+Buying *everything in the game* — a full set plus every permanent upgrade maxed — makes a
+run about a third longer (99 s → 131 s standing still). That is the intended band. It
+widens the door; it does not walk through it for you.
+
+### Four things that were quietly broken, and one that still is
+
+**Two permanent upgrades and two level-up cards did literally nothing.** "Reach" and
+"Long Rope" added metres to the leash; "Haste" and "Light Feet" made you walk faster on
+the thumbstick. The thumbstick was removed when your circle was pinned to your real GPS
+position — and all four went on being sold and offered anyway, one of them for coins. A
+card that silently does nothing is worse than a weak card, because there is no way for a
+player to find out. They now give weapon range, healing, experience and healing again.
+
+**An equipment item made the game unlosable.** A "Splitter" giving +1 projectile and +1
+pierce turned a run that died at 97 seconds into one still at full health after 240 — and
+each half did that on its own, because the starting weapon fires *one* shot (so "+1" is
+double damage) and monsters queue along a street (so one piercing shot hits the queue).
+It was cut. Extra shots and piercing remain level-up cards, earned in a run and lost with
+it.
+
+**Defence is worth about one second, and that is not the items' fault.** Measured
+standing still, +60 health bought one second of life. So did 15% armour, and so did
+healing three points a second. Pushing the numbers far higher barely moved them. The
+reason showed up in a trace of a whole run:
+
+```
+ 0s  hp 200   12 monsters   nearest 17 m
+30s  hp 200   52 monsters   nearest 33 m
+60s  hp 200   98 monsters   nearest 19 m
+80s  hp 200  128 monsters   nearest 11 m
+90s  hp 200  143 monsters   nearest  4 m   <- nine arrive at once
+97s  dead
+```
+
+Health is untouched for ninety seconds and then gone in five. The swarm spends the run
+walking towards you doing no damage whatsoever, and the moment it lands it hits the cap
+of 42 damage a second, which empties the bar in 4.8. **There is no middle.** Nothing that
+protects you can matter, because there is nothing to be protected from until it is
+already too late — and this applies to the Vitality and Thick Skin cards, and to the
+Bruiser's whole identity, exactly as much as to the armour slot.
+
+This one is left **unfixed on purpose**. Fixing it means letting the closing crowd hurt
+you gradually, so health becomes something spent across a run rather than a wall at the
+end of it. That changes how the game feels, and how it feels was signed off already, so
+it is a decision to be made deliberately rather than a number to nudge on the quiet.
+
+---
+
 ## Known issues and honest limitations
 
 | | |

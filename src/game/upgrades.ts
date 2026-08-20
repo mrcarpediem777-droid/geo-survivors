@@ -56,12 +56,14 @@ export interface Loadout {
   extraProjectiles: number;
   /** How many monsters a shot passes through before stopping. */
   pierce: number;
-  moveSpeedMultiplier: number;
-  leashBonusMetres: number;
   pickupRadiusMultiplier: number;
   maxHealthBonus: number;
   /** Fraction of incoming damage ignored, 0 to 0.6. */
   armour: number;
+  /** Extra health healed per second, on top of the base trickle. */
+  regenBonus: number;
+  /** Multiplies every scrap of experience picked up. */
+  xpMultiplier: number;
 }
 
 export function freshLoadout(): Loadout {
@@ -72,11 +74,11 @@ export function freshLoadout(): Loadout {
     rangeMultiplier: 1,
     extraProjectiles: 0,
     pierce: 0,
-    moveSpeedMultiplier: 1,
-    leashBonusMetres: 0,
     pickupRadiusMultiplier: 1,
     maxHealthBonus: 0,
     armour: 0,
+    regenBonus: 0,
+    xpMultiplier: 1,
   };
 }
 
@@ -224,28 +226,37 @@ export const UPGRADE_CARDS: UpgradeCard[] = [
       l.pierce += 1;
     },
   },
+  /*
+   * These two replaced "Light Feet" and "Long Rope".
+   *
+   * Both of those moved the character around on the thumbstick -- and the
+   * thumbstick is gone; you are simply where you really are now. They still sat
+   * in the deck, still cost a level-up, and did precisely nothing. A card that
+   * silently does nothing is worse than a weak card, because the player has no
+   * way to find out.
+   */
   {
-    id: 'speed',
-    title: 'Light Feet',
-    description: 'You move 15% faster on the stick.',
-    glyph: '»',
+    id: 'scholar',
+    title: 'Keen Eye',
+    description: 'Every scrap of experience is worth 25% more. Levels arrive sooner, all run long.',
+    glyph: '✦',
     isWeapon: false,
-    maxTimes: 5,
+    maxTimes: 4,
     available: () => true,
     apply: (l) => {
-      l.moveSpeedMultiplier *= 1.15;
+      l.xpMultiplier *= 1.25;
     },
   },
   {
-    id: 'leash',
-    title: 'Long Rope',
-    description: 'Roam 6 metres further from your real position. More room to kite.',
-    glyph: '⌒',
+    id: 'regen',
+    title: 'Second Wind',
+    description: 'Heal back a full point of health every second. Turns a bad moment into a survivable one.',
+    glyph: '♡',
     isWeapon: false,
-    maxTimes: 3,
+    maxTimes: 4,
     available: () => true,
     apply: (l) => {
-      l.leashBonusMetres += 6;
+      l.regenBonus += 1;
     },
   },
   {

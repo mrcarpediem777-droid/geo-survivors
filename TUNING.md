@@ -283,6 +283,73 @@ Six of them, in `src/game/metaProgress.ts` with their costs. Bought with essence
 forever, and deliberately modest — a new player should not simply be worse at the game
 than an old one. If they ever start deciding runs, shrink them.
 
+**Two of these used to do nothing at all.** "Reach" added metres to the leash and
+"Haste" made you walk faster on the thumbstick. Both of those things stopped existing
+the day the thumbstick was removed and your circle was pinned to your real position —
+but the shop went on selling them. They now give weapon range and healing instead,
+which are things that exist. The same was true of two level-up cards, "Light Feet" and
+"Long Rope"; they are now "Keen Eye" (+25% experience) and "Second Wind" (heal faster).
+
+## Equipment
+
+Eleven items in `src/game/equipment.ts`, in three slots — weapon, armour, charm — with
+**one item worn per slot**. That limit is the whole design: without it the shop is a
+shopping list and every player ends up wearing the same things. With it, money buys a
+decision.
+
+Every item is one line in that file. To change what something costs or does, change the
+number next to it; nothing else needs touching.
+
+**What a full set is worth, measured** (standing still on a Da Nang street, no level-up
+cards taken, so the numbers are low across the board but comparable):
+
+| Worn | Survived | Killed |
+|---|---|---|
+| nothing | 99 s | 40 |
+| Balanced Rig | 115 s | 54 |
+| Hair Trigger | 107 s | 45 |
+| Rig + Plates + Lens | 116 s | 54 |
+| a full set **and** every permanent upgrade maxed | 131 s | 61 |
+
+Buying literally everything in the game makes a run about a third longer. That is the
+band these are meant to sit in — wide enough to feel, nowhere near enough to win for you.
+
+**One item had to be thrown out.** A "Splitter" giving +1 projectile and +1 pierce turned
+a run that died at 97 seconds into one still at full health after 240. Either half did it
+alone: the plain bolt fires *one* shot, so "+1" is simply double damage, and monsters
+queue along a street, so a piercing shot hits the whole queue. Extra shots and piercing
+stay as level-up cards, earned inside a run and lost with it. A permanent purchase that
+makes the game unlosable is not an upgrade, it is an off switch.
+
+### The armour slot is currently worth about one second — and why
+
+Measured, standing still: +60 health bought **1 second**. So did 15% armour. So did
+healing 3 points a second. Pushing them further barely helped — +100 health, 25% armour
+and 8 health a second each bought one or two seconds.
+
+That is not a fault in the items. It is the shape of the fight. Sampling a run every ten
+seconds:
+
+```
+ 0s  hp 200   12 monsters   nearest 17 m
+30s  hp 200   52 monsters   nearest 33 m
+60s  hp 200   98 monsters   nearest 19 m
+80s  hp 200  128 monsters   nearest 11 m
+90s  hp 200  143 monsters   nearest  4 m   <- nine of them arrive at once
+97s  dead
+```
+
+**Your health is untouched for ninety seconds and then gone in five.** The swarm spends
+the whole run walking to you doing no damage at all, and the moment it arrives it hits
+the damage cap of 42 a second, which empties a 200-point health bar in 4.8 seconds. There
+is no middle. Nothing that protects you can matter, because there is nothing to protect
+you *from* until the instant it is already too late — and that applies to the Vitality
+and Thick Skin cards and to the Bruiser character just as much as to this slot.
+
+Fixing it means letting the crowd hurt you *gradually* as it closes, so health becomes
+something you spend all run instead of a wall you hit at the end. That changes how the
+game feels, so it is a decision to make deliberately rather than a number to nudge.
+
 ---
 
 ## Streets, and how many nests
