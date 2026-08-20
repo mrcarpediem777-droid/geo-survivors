@@ -12,6 +12,7 @@
  * Deliberately kept thin. Wiring lives here; nothing else does.
  */
 
+import { TUNING } from './config/tuning';
 import { Profile } from './profile/profile';
 import { PlayerLocation } from './location/playerLocation';
 import { MapView } from './map/mapView';
@@ -155,6 +156,10 @@ async function boot(): Promise<void> {
       // well, without having to break the internet first.
       showMapTrouble: () => showMapTrouble(uiContainer, mapView.getDiagnostics()),
       game,
+      // Every gameplay number, live. Changing one here takes effect on the next
+      // run without a rebuild, which is what makes balancing a measurement job
+      // rather than a guessing one. Behind the same dev-tools gate as the rest.
+      tuning: TUNING,
     };
   }
 }

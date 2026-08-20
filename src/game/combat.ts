@@ -95,6 +95,10 @@ export class Combat {
 
   /** Contact damage gathered this frame, before the cap is applied. */
   private contactDamageThisFrame = 0;
+  /** Damage from the crowd closing in, gathered per frame and capped separately. */
+  private pressureDamageThisFrame = 0;
+  /** Seconds left before healing resumes. Reset by every scratch. */
+  private regenPausedFor = 0;
 
   /** Money picked up this run, waiting to be banked. */
   coinsCollected = 0;
@@ -326,6 +330,7 @@ export class Combat {
     this.coinsCollected = 0;
     this.awaitingCardChoice = false;
     this.pendingLevelUps = 0;
+    this.regenPausedFor = 0;
     this.dead = false;
   }
 
@@ -357,13 +362,29 @@ export class Combat {
       const cap = TUNING.player.maxContactDamagePerSecond * deltaSeconds;
       this.damagePlayer(Math.min(this.contactDamageThisFrame, cap));
     }
+
+    // The squeeze from the crowd closing in, capped separately and much lower.
+    // It has its own ceiling so that being surrounded is still the dangerous
+    // thing -- pressure is the warning, not the execution.
+    if (this.pressureDamageThisFrame > 0) {
+      const cap = TUNING.player.crowdPressure.maxPerSecond * deltaSeconds;
+      this.damagePlayer(Math.min(this.pressureDamageThisFrame, cap));
+    }
     this.fireWeapons(deltaSeconds, playerX, playerY);
     this.updateProjectiles(deltaSeconds);
     this.updateOrbs(deltaSeconds, playerX, playerY);
 
-    // A slow trickle of healing, so one careless moment is not permanent.
-    const regen = TUNING.player.healthRegenPerSecond + this.regenBonus;
-    this.health = Math.min(this.maxHealth, this.health + regen * deltaSeconds);
+    // A slow trickle of healing, so one careless moment is not permanent --
+    // but only once nothing is pressing on you. See the tuning file: healing
+    // that outpaces the crowd makes the whole middle of a run free, and there is
+    // a cliff rather than a slope between "helps" and "cancels the game".
+    // Recovering is the reward for breaking away, which is the one thing this
+    // game always wants you to be able to do.
+    this.regenPausedFor = Math.max(0, this.regenPausedFor - deltaSeconds);
+    if (this.regenPausedFor <= 0) {
+      const regen = TUNING.player.healthRegenPerSecond + this.regenBonus;
+      this.health = Math.min(this.maxHealth, this.health + regen * deltaSeconds);
+    }
   }
 
   /* ------------------------------------------------------------------ */
@@ -639,6 +660,7 @@ export class Combat {
     const store = this.entities;
     const types = TUNING.monsters.types;
     this.contactDamageThisFrame = 0;
+    this.pressureDamageThisFrame = 0;
 
     for (let id = 0; id < store.usedSlots; id++) {
       if (!store.alive[id] || store.kind[id] !== EntityKind.MONSTER) continue;
@@ -740,14 +762,30 @@ export class Combat {
       store.lng[id] = this.collision.toLng(nextX);
       store.lat[id] = this.collision.toLat(nextY);
 
-      /* --- touching the player hurts --- */
+      /* --- touching the player hurts, and closing in hurts a little --- */
       if (store.damage[id] > 0) {
         const touchDistance = store.radiusMetres[id] + 2.2;
-        if (Math.hypot(playerX - nextX, playerY - nextY) < touchDistance) {
+        const toPlayer = Math.hypot(playerX - nextX, playerY - nextY);
+        if (toPlayer < touchDistance) {
           // Gathered up and capped below, rather than applied one monster at a
           // time. Sixty of them touching at once is a swarm closing in, not
           // sixty separate accidents.
           this.contactDamageThisFrame += store.damage[id] * deltaSeconds;
+        } else if (toPlayer < TUNING.player.crowdPressure.radiusMetres) {
+          // NOT touching, but near enough to be leaning on you.
+          //
+          // Without this the whole run was a flat line and then a wall: measured
+          // standing on a real street, no monster touched the player ONCE in 99
+          // seconds, health read full at every sample, and then the entire bar
+          // went inside the last nine. Nothing defensive could matter, and the
+          // player never got the one warning the game wants to give -- "you are
+          // at half health, walk away."
+          //
+          // Falls off with distance, so a monster at the edge of the circle is
+          // barely there and one about to land on you nearly bites properly.
+          const closeness = 1 - toPlayer / TUNING.player.crowdPressure.radiusMetres;
+          this.pressureDamageThisFrame +=
+            store.damage[id] * TUNING.player.crowdPressure.share * closeness * deltaSeconds;
         }
       }
     }
@@ -1174,6 +1212,7 @@ export class Combat {
     if (this.invulnerableFor > 0) return;
     const taken = amount * (1 - this.loadout.armour);
     this.health -= taken;
+    this.regenPausedFor = TUNING.player.regenPausedAfterHurtSeconds;
 
     // Only a real hit triggers the grace period, not the steady graze of a
     // crowd -- otherwise standing in a swarm would be free.
