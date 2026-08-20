@@ -35,6 +35,7 @@ import { freshLoadout, pickCards, type Loadout, type UpgradeCard } from './upgra
 import { seededRandom } from '../world/determinism';
 import { bonusesFrom, costToBuy, META_UPGRADES, type MetaLevels } from './metaProgress';
 import { CHARACTERS, characterById } from './characters';
+import { bonusesFromEquipment, itemById } from './equipment';
 import type { Profile } from '../profile/profile';
 import { worldCellFor } from '../world/determinism';
 import { activeBasemap } from '../config/basemap';
@@ -201,8 +202,11 @@ export class Game {
       data.metaLevels,
       data.unlockedCharacters,
       data.selectedCharacter,
+      data.ownedEquipment,
+      data.equippedBySlot,
       (id) => this.buyUpgrade(id),
       (id) => this.chooseOrBuyCharacter(id),
+      (id) => this.buyOrEquip(id),
       () => {}
     );
   }
@@ -229,6 +233,41 @@ export class Game {
     }
 
     // A character only takes effect from the next run, so say so by starting one.
+    this.openShop();
+    this.restartRun();
+  }
+
+  /**
+   * One tap does everything an item needs: buy it if you do not own it, wear it
+   * if you do, take it off if you are already wearing it. Same reasoning as the
+   * character buttons -- a separate "equip" step would need explaining, and this
+   * needs none.
+   */
+  private buyOrEquip(id: string): void {
+    if (!this.profile) return;
+    const data = this.profile.get();
+    const item = itemById(id);
+    if (!item) return;
+
+    let owned = data.ownedEquipment;
+    let essence = data.essence;
+
+    if (!owned.includes(id)) {
+      if (essence < item.cost) return;
+      essence -= item.cost;
+      owned = [...owned, id];
+    }
+
+    const worn = { ...data.equippedBySlot };
+    // Tapping what you already wear takes it off. One item to a slot, so
+    // choosing a new one silently replaces whatever was there.
+    if (worn[item.slot] === id) delete worn[item.slot];
+    else worn[item.slot] = id;
+
+    this.profile.update({ essence, ownedEquipment: owned, equippedBySlot: worn });
+
+    // Equipment is folded in at the start of a run, so it only means anything
+    // from the next one. Start it, exactly as choosing a character does.
     this.openShop();
     this.restartRun();
   }
@@ -287,7 +326,6 @@ export class Game {
     this.loadout.fireRateMultiplier *= hero.fireRateMultiplier;
     this.loadout.pickupRadiusMultiplier *= hero.pickupMultiplier;
     this.loadout.armour = Math.min(0.6, this.loadout.armour + hero.armour);
-    this.combat.setCoinBonus(hero.coinBonus);
     this.playerSprite = hero.sprite;
     this.layer.playerSprite = hero.sprite;
 
@@ -295,12 +333,26 @@ export class Game {
     const meta = this.metaBonuses();
     this.loadout.maxHealthBonus += meta.bonusHealth;
     this.loadout.damageMultiplier *= meta.damageMultiplier;
-    this.loadout.leashBonusMetres += meta.bonusLeashMetres;
+    this.loadout.rangeMultiplier *= meta.rangeMultiplier;
     this.loadout.pickupRadiusMultiplier *= meta.pickupMultiplier;
-    this.loadout.moveSpeedMultiplier *= meta.moveMultiplier;
+    this.loadout.regenBonus += meta.regenBonus;
 
+    // Then whatever is worn in the three equipment slots, on top of both.
+    const kit = bonusesFromEquipment(this.profile?.get().equippedBySlot ?? {});
+    this.loadout.damageMultiplier *= kit.damageMultiplier;
+    this.loadout.fireRateMultiplier *= kit.fireRateMultiplier;
+    this.loadout.rangeMultiplier *= kit.rangeMultiplier;
+    this.loadout.extraProjectiles += kit.extraProjectiles;
+    this.loadout.pierce += kit.pierce;
+    this.loadout.maxHealthBonus += kit.healthBonus;
+    this.loadout.armour = Math.min(0.6, this.loadout.armour + kit.armour);
+    this.loadout.regenBonus += kit.regenBonus;
+    this.loadout.pickupRadiusMultiplier *= kit.pickupMultiplier;
+    this.loadout.xpMultiplier *= kit.xpMultiplier;
+
+    this.combat.setCoinBonus(hero.coinBonus + kit.coinBonus);
     this.combat.setLoadout(this.loadout);
-    this.combat.setCaptureSpeed(meta.captureSpeedMultiplier);
+    this.combat.setCaptureSpeed(meta.captureSpeedMultiplier * kit.captureSpeedMultiplier);
     this.combat.reset();
 
     // Re-seed the nests from wherever the walls were built. Falling back to
@@ -535,13 +587,7 @@ export class Game {
 
     // 2. Move the character, honouring the leash and any upgrades taken.
     if (!paused) {
-      this.character.update(
-        deltaSeconds,
-        leashCentre,
-        input,
-        this.loadout.moveSpeedMultiplier,
-        this.loadout.leashBonusMetres
-      );
+      this.character.update(deltaSeconds, leashCentre, input);
     }
 
     // 2b. Push the character out of any building it has walked into.

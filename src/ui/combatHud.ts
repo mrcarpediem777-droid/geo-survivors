@@ -12,6 +12,7 @@
 import type { UpgradeCard } from '../game/upgrades';
 import { META_UPGRADES, costToBuy, metaLevel, type MetaLevels } from '../game/metaProgress';
 import { CHARACTERS } from '../game/characters';
+import { EQUIPMENT, SLOT_NAMES, itemById, type EquipmentSlot } from '../game/equipment';
 import { SPRITES } from '../render/emojiAtlas';
 
 export class CombatHud {
@@ -404,8 +405,11 @@ ${data.distanceMetres.toFixed(0)} m`;
     levels: MetaLevels,
     unlockedCharacters: string[],
     selectedCharacter: string,
+    ownedEquipment: string[],
+    equippedBySlot: Record<string, string>,
     onBuy: (id: string) => void,
     onCharacter: (id: string) => void,
+    onEquipment: (id: string) => void,
     onClose: () => void
   ): void {
     this.shopScreen.innerHTML = '';
@@ -467,6 +471,74 @@ ${data.distanceMetres.toFixed(0)} m`;
         button.addEventListener('click', () => onCharacter(hero.id));
       }
       this.shopScreen.appendChild(button);
+    }
+
+    // ----- equipment ---------------------------------------------------
+    //
+    // Three slots, one item each. The slot limit is the whole point: without it
+    // this becomes a shopping list and every player ends up with the same
+    // loadout. With it, the money buys a decision rather than a number.
+    const kitHeading = document.createElement('div');
+    kitHeading.innerHTML =
+      '<div style="font:700 12px/1 ui-monospace,monospace;color:#c084fc;letter-spacing:0.14em;margin-bottom:2px">EQUIPMENT</div>' +
+      '<div style="font:400 11.5px/1.45 system-ui,sans-serif;color:#9fb3c8;max-width:300px">One item in each of the three slots. Tap to buy, tap again to take off. Yours forever.</div>';
+    kitHeading.style.textAlign = 'center';
+    kitHeading.style.margin = '16px 0 10px';
+    this.shopScreen.appendChild(kitHeading);
+
+    const slots: EquipmentSlot[] = ['weapon', 'armour', 'charm'];
+    for (const slot of slots) {
+      const wornId = equippedBySlot[slot];
+      const worn = wornId ? itemById(wornId) : undefined;
+
+      const slotLabel = document.createElement('div');
+      slotLabel.style.cssText =
+        'width:min(340px,88vw);margin:10px 0 5px;font:600 11px ui-monospace,monospace;' +
+        'color:#7d8fa1;letter-spacing:0.1em;display:flex;justify-content:space-between';
+      slotLabel.innerHTML =
+        '<span>' + SLOT_NAMES[slot].toUpperCase() + '</span>' +
+        '<span style="color:' + (worn ? '#4ade80' : '#5b6b7d') + '">' +
+        (worn ? worn.glyph + ' ' + worn.name : 'empty') + '</span>';
+      this.shopScreen.appendChild(slotLabel);
+
+      for (const item of EQUIPMENT.filter((i) => i.slot === slot)) {
+        const owned = ownedEquipment.includes(item.id);
+        const equipped = wornId === item.id;
+        const affordable = owned || essence >= item.cost;
+
+        const button = document.createElement('button');
+        Object.assign(button.style, {
+          width: 'min(340px, 88vw)',
+          marginBottom: '6px',
+          padding: '9px 13px',
+          borderRadius: '10px',
+          border: equipped ? '1px solid rgba(74,222,128,0.85)' : '1px solid rgba(255,255,255,0.12)',
+          background: equipped
+            ? 'rgba(74,222,128,0.16)'
+            : affordable
+              ? 'rgba(255,255,255,0.06)'
+              : 'rgba(255,255,255,0.03)',
+          color: affordable ? '#e6edf3' : '#7d8fa1',
+          textAlign: 'left',
+          cursor: affordable ? 'pointer' : 'default',
+          display: 'flex',
+          gap: '11px',
+          alignItems: 'center',
+        } satisfies Partial<CSSStyleDeclaration>);
+
+        const badge = equipped ? 'WORN' : owned ? 'tap to wear' : String(item.cost);
+        button.innerHTML =
+          '<span style="font-size:19px;width:26px;text-align:center">' + item.glyph + '</span>' +
+          '<span style="flex:1">' +
+          '<span style="display:block;font:700 12.5px system-ui,sans-serif">' + item.name + '</span>' +
+          '<span style="display:block;font:400 11px/1.35 system-ui,sans-serif;color:#9fb3c8">' + item.description + '</span>' +
+          '</span>' +
+          '<span style="font:700 11.5px ui-monospace,monospace;color:' +
+          (equipped ? '#4ade80' : affordable ? '#e6edf3' : '#5b6b7d') + '">' + badge + '</span>';
+
+        if (affordable) button.addEventListener('click', () => onEquipment(item.id));
+        this.shopScreen.appendChild(button);
+      }
     }
 
     // ----- permanent upgrades -----------------------------------------

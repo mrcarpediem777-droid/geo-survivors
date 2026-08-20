@@ -127,6 +127,12 @@ export class Combat {
   setLoadout(loadout: Loadout): void {
     this.loadout = loadout;
     this.maxHealth = TUNING.player.maxHealth + loadout.maxHealthBonus;
+    // Read out of the loadout rather than pushed in separately, so a card taken
+    // mid-run and a piece of equipment worn before it both arrive by the same
+    // road. Two roads is how an effect ends up applying in one case and not the
+    // other.
+    this.regenBonus = loadout.regenBonus;
+    this.xpMultiplier = loadout.xpMultiplier;
   }
 
   /* ------------------------------------------------------------------ */
@@ -356,7 +362,8 @@ export class Combat {
     this.updateOrbs(deltaSeconds, playerX, playerY);
 
     // A slow trickle of healing, so one careless moment is not permanent.
-    this.health = Math.min(this.maxHealth, this.health + TUNING.player.healthRegenPerSecond * deltaSeconds);
+    const regen = TUNING.player.healthRegenPerSecond + this.regenBonus;
+    this.health = Math.min(this.maxHealth, this.health + regen * deltaSeconds);
   }
 
   /* ------------------------------------------------------------------ */
@@ -389,6 +396,12 @@ export class Combat {
   setCaptureSpeed(multiplier: number): void {
     this.captureSpeedMultiplier = multiplier;
   }
+
+  /** Extra healing per second, from cards, upgrades and equipment. */
+  private regenBonus = 0;
+
+  /** Multiplies experience picked up. Equipment and the Keen Eye card. */
+  private xpMultiplier = 1;
 
   private updateNests(deltaSeconds: number): void {
     for (let i = this.nests.length - 1; i >= 0; i--) {
@@ -1229,7 +1242,7 @@ export class Combat {
   }
 
   private gainXp(amount: number): void {
-    this.xp += amount;
+    this.xp += amount * this.xpMultiplier;
 
     while (this.xp >= this.xpForNextLevel) {
       this.xp -= this.xpForNextLevel;
