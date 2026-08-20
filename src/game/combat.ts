@@ -144,10 +144,39 @@ export class Combat {
     const roll = seededRandom(worldSeed);
 
     for (let i = 0; i < TUNING.nests.countPerCell; i++) {
+      // GIVE EACH NEST ITS OWN SLICE OF THE COMPASS.
+      //
+      // Picking a fresh random direction per nest clusters them -- with twelve
+      // draws you reliably get three in one quarter and none in another, so the
+      // swarm only ever arrives from one or two sides. Handing each nest a
+      // sector guarantees pressure from every direction, which is what makes a
+      // junction feel like a junction: something coming up the street at you and
+      // something else coming across it.
+      const sector = (i / TUNING.nests.countPerCell) * Math.PI * 2;
+
+      // SPREAD BY DISTANCE AS WELL AS DIRECTION.
+      //
+      // Sectors alone were not enough: the distances were still random, so the
+      // handful of nests that happened to land close together all woke at once
+      // and the swarm arrived from one side. Measured -- three of the six awake
+      // nests were west, two of them at 75 m, while south and east sat asleep
+      // beyond 190 m and never sent anybody.
+      //
+      // Every third nest is now a near one, so whichever way you face there is
+      // something awake in that direction, and the rest wait further out for
+      // when you walk their way.
+      const band = i % 3;
+      const near = TUNING.nests.minDistanceMetres;
+      const far = TUNING.nests.maxDistanceMetres;
+      const bandMin = near + ((far - near) * band) / 3;
+      const bandMax = near + ((far - near) * (band + 1)) / 3;
+
       const spot = this.findOpenSpot(
         roll,
-        TUNING.nests.minDistanceMetres,
-        TUNING.nests.maxDistanceMetres
+        bandMin,
+        bandMax,
+        sector,
+        (Math.PI * 2) / TUNING.nests.countPerCell
       );
       if (!spot) continue;
 
@@ -187,11 +216,10 @@ export class Combat {
       // single attempt failed most of the time -- twelve were asked for and
       // three appeared, leaving a lull until the nests could walk some over.
       for (let attempt = 0; attempt < 14; attempt++) {
-        const fromNest = this.nests.length ? this.nests[i % this.nests.length] : { x: 1, y: 0 };
-        const nestAngle = Math.atan2(fromNest.y, fromNest.x);
-        // Spread wider with each failed attempt rather than retrying the same
-        // narrow arc.
-        const angle = nestAngle + (roll() - 0.5) * (1.5 + attempt * 0.35);
+        // One per direction, so the first thing you see is not always off to
+        // the same side. Later attempts widen if that bearing has no road.
+        const bearing = (i / TUNING.nests.openingWaveCount) * Math.PI * 2;
+        const angle = bearing + (roll() - 0.5) * (0.5 + attempt * 0.45);
         const distance =
           TUNING.nests.openingWaveMinMetres +
           roll() * (TUNING.nests.openingWaveMaxMetres - TUNING.nests.openingWaveMinMetres);
@@ -226,7 +254,11 @@ export class Combat {
   private findOpenSpot(
     roll: () => number,
     minMetres: number,
-    maxMetres: number
+    maxMetres: number,
+    /** Middle of the direction this nest should sit in, in radians. */
+    sectorCentre = 0,
+    /** How wide that direction may be. A full circle means anywhere. */
+    sectorWidth = Math.PI * 2
   ): { x: number; y: number } | null {
     // Give way gradually rather than all at once.
     //
@@ -246,7 +278,11 @@ export class Combat {
 
     for (const rule of attempts) {
       for (let attempt = 0; attempt < 160; attempt++) {
-        const angle = roll() * Math.PI * 2;
+        // Stay in this nest's slice at first. If nothing there works after a
+        // while, open up rather than leave the direction empty -- a nest in a
+        // slightly wrong place beats no nest.
+        const spread = attempt < 100 ? sectorWidth : Math.PI * 2;
+        const angle = sectorCentre + (roll() - 0.5) * spread;
         const distance = minMetres + roll() * (maxMetres - minMetres);
         const x = Math.cos(angle) * distance;
         const y = Math.sin(angle) * distance;
