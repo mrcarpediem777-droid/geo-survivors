@@ -10,7 +10,7 @@ Claude: *"Read PLAYBOOK.md and tell me where we left off."*
 | | |
 |---|---|
 | **Milestone reached** | **M5 — clearing nests and permanent progress** ✅ |
-| **Next milestone** | M6 — polish: ~~installable app~~ ✅, tutorial, low power mode, analytics |
+| **Next milestone** | M6 complete — installable app, tutorial, low power, ads placeholder, play log |
 | **Code lives at** | https://github.com/mrcarpediem777-droid/geo-survivors |
 | **Live URL** | **https://geo-survivors.vercel.app** |
 | **Vercel dashboard** | https://vercel.com/abc-70f4/geo-survivors |
@@ -727,6 +727,82 @@ never saw it at all. Nests are placed 70–420 m out; standing on a Da Nang stre
 for a hundred seconds it did not appear once. It now fires at 200 m, while the
 nest is still just a marker on the edge of the screen, which is exactly when
 "what is that?" is being asked.
+
+---
+
+## Battery, ads and the play log (M6)
+
+### The battery is a design constraint, not a nicety
+
+This game asks somebody to walk for an hour with the screen awake and the GPS
+running. A game that strands a person a mile from home with a dead phone has done
+real harm, and no amount of good combat makes up for it.
+
+**The biggest win was not a setting.** A phone in a pocket with the screen dark
+was still drawing sixty frames a second of a map nobody was looking at. Now the
+loop stops dead when the game is hidden — measured: ten seconds of frames while
+hidden advanced the run by **0.000 s and cost 0.0 ms**. That happens always and
+is not something anyone has to switch on.
+
+**Low power mode** is in the shop, under SETTINGS. It draws thirty frames a
+second instead of sixty, thins the swarm at 150, and rebuilds pathfinding half as
+often. Measured over a minute of play offered 3,600 frames:
+
+| | frames drawn | simulation work |
+|---|---|---|
+| normal | 3,600 (100%) | 4,605 ms |
+| low power | 1,800 (50%) | 3,045 ms |
+
+The map library only redraws when we ask it to, so skipping our frame skips its
+work as well — and *that* is the larger half of the saving, since it draws the
+whole vector map and we draw some dots on top.
+
+On Android the game offers the mode when the battery drops below 25%. iPhones do
+not report their battery to web pages at all — Safari removed it deliberately,
+because a battery level turns out to be a good way of recognising the same person
+across websites, which is a fair decision — so there it has to be switched on by
+hand.
+
+**None of this has been measured on a real phone on a real walk yet.** Frames and
+milliseconds are what can be measured from here; actual battery percentage per
+hour cannot be.
+
+### Ads: the promise is built into the shape of the code
+
+The brief says the reward must be paid **even if the ad fails**. That is easy to
+agree with and easy to forget the day an ad network starts timing out at three in
+the morning — so it is not left to whoever calls it. `watchAdFor` takes the reward
+itself and pays it **exactly once on every path there is**: played, failed to
+load, closed early, or our own code throwing.
+
+Tested by forcing each path: five forced failures paid five rewards; closing the
+ad the instant it appeared still paid. `TUNING.performance.fakeAdFailureRate` is
+there so the failure path can be re-checked at any time rather than being tested
+once and rotting — set it to 1 and every ad fails.
+
+Two placements, both on the death screen, both behind a button the player chose
+to press: **carry on this run** (once per run; the crowd standing on you is
+swept away first, because handing somebody a full health bar inside a swarm is a
+second death sold at the price of an advert) and **double this run's coins**.
+Nothing ever interrupts a run. Interrupting somebody walking down a real street
+is a genuinely bad thing to do, quite apart from the brief forbidding it.
+
+### The play log keeps how far, never where
+
+Every number in this project so far has come from a simulation standing still on
+one street in Da Nang, and that simulation has been wrong in ways nobody could
+have guessed from a desk. The log records real walks instead: runs, how long,
+what level, how many kills and coins, nests cleared, ads and whether they failed,
+and **how far you walked**.
+
+**It never records a position.** Not coordinates, not the neighbourhood, not the
+town. A log of where somebody walks and when is one of the most sensitive things a
+phone can produce, and this game would have an unusually good one. Distance is
+enough to balance a game and useless to anybody who steals it.
+
+It never leaves the phone — there is no server and no request is made. "Copy my
+play log" in SETTINGS puts it on the clipboard, and if the browser refuses the
+clipboard it goes on screen to be selected by hand.
 
 ---
 

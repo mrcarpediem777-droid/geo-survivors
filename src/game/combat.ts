@@ -414,6 +414,21 @@ export class Combat {
     this.coinBonus = bonus;
   }
 
+  /**
+   * A hard ceiling on the swarm, set by low power mode. Null means the ordinary
+   * rule -- as many as the nests are entitled to between them.
+   */
+  private monsterCap: number | null = null;
+
+  setMonsterCap(cap: number | null): void {
+    this.monsterCap = cap;
+  }
+
+  private monsterCeiling(): number {
+    const ordinary = TUNING.nests.maxAlivePerNest * this.nests.length;
+    return this.monsterCap === null ? ordinary : Math.min(ordinary, this.monsterCap);
+  }
+
   setCaptureSpeed(multiplier: number): void {
     this.captureSpeedMultiplier = multiplier;
   }
@@ -468,7 +483,7 @@ export class Combat {
       // back to the nest that made it would need bookkeeping on every monster
       // for no gameplay benefit -- and my first attempt at it silently
       // decremented whichever nest happened to be first in the list.
-      if (this.livingMonsters >= TUNING.nests.maxAlivePerNest * this.nests.length) continue;
+      if (this.livingMonsters >= this.monsterCeiling()) continue;
       this.spawnMonster(nest);
     }
   }
@@ -1206,6 +1221,28 @@ export class Combat {
 
     this.livingMonsters--;
     store.release(id);
+  }
+
+  /**
+   * Get up again, once, in the same spot.
+   *
+   * The crowd standing on top of you is cleared away first. Without that,
+   * "carry on" hands the player back a full health bar and takes it away inside
+   * two seconds, which is not a second chance -- it is a second death sold at
+   * the price of watching an advert.
+   */
+  revive(playerX: number, playerY: number): void {
+    const store = this.entities;
+    for (let id = 0; id < store.usedSlots; id++) {
+      if (!store.alive[id] || store.kind[id] !== EntityKind.MONSTER) continue;
+      const d = Math.hypot(this.collision.toLocalX(store.lng[id]) - playerX,
+                           this.collision.toLocalY(store.lat[id]) - playerY);
+      if (d < TUNING.player.reviveClearRadiusMetres) this.killMonster(id, false);
+    }
+    this.health = this.maxHealth;
+    this.dead = false;
+    this.regenPausedFor = 0;
+    this.invulnerableFor = TUNING.player.reviveGraceSeconds;
   }
 
   private damagePlayer(amount: number): void {

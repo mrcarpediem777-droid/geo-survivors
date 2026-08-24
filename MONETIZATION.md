@@ -82,6 +82,21 @@ are placed at the right moments. A real ad SDK drops into the same slot later.
 **Test the failure path too, deliberately** — make the fake ad fail sometimes and confirm
 the reward still arrives.
 
+### Built, and how the promise is kept
+
+The rule is not left to whoever calls the ad code. `watchAdFor` takes the reward itself
+and pays it **exactly once on every path there is**: the ad played, it failed to load, the
+player closed it early, or our own code threw. There is no way to call that function and
+not pay out, which is the only kind of promise worth making.
+
+Verified by forcing each path — five forced failures paid five rewards, and closing the ad
+the instant it appeared still paid. `TUNING.performance.fakeAdFailureRate` keeps the
+failure path testable forever: set it to 1 and every ad fails.
+
+Placements live so far, both on the death screen, both behind a button the player chose to
+press: **carry on this run** (once per run) and **double this run's coins**. Nothing
+interrupts a run, ever.
+
 ---
 
 ## The honest maths, kept here so it is not forgotten
