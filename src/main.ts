@@ -15,6 +15,9 @@
 import { TUNING } from './config/tuning';
 import { registerOfflineSupport, offerInstall } from './app/install';
 import { Tutorial } from './ui/tutorial';
+import { watchBattery, offerLowPower } from './app/battery';
+import * as rewardedAd from './app/rewardedAd';
+import { Journal } from './app/journal';
 import { Profile } from './profile/profile';
 import { PlayerLocation } from './location/playerLocation';
 import { MapView } from './map/mapView';
@@ -142,6 +145,30 @@ async function boot(): Promise<void> {
   );
   game.tutorial = tutorial;
 
+  // 6d. THE LOG ------------------------------------------------------------
+  // Every number so far has come from a simulation standing on one street in Da
+  // Nang, and that simulation has been wrong in ways nobody could have guessed.
+  // This records real walks instead. It keeps how FAR somebody went and never
+  // where, which is enough to balance a game and useless to anyone who steals
+  // it, and it never leaves the phone.
+  const journal = new Journal();
+  game.journal = journal;
+  journal.record('opened', { installed: profile.get().installedToHomeScreen });
+
+  // 6c. THE BATTERY --------------------------------------------------------
+  // Carry over whatever was chosen last time, then keep half an eye on the
+  // charge. Nothing is switched on behind the player's back: somebody with 20%
+  // left and five minutes of walking to do is entitled to the whole game.
+  game.setLowPower(profile.get().lowPowerMode);
+  const stopWatchingBattery = watchBattery((percent) => {
+    if (game.lowPower) return;
+    offerLowPower(uiContainer, percent, () => {
+      game.setLowPower(true);
+      profile.update({ lowPowerMode: true });
+      stopWatchingBattery();
+    });
+  });
+
   void mapView.whenReady().then(() => {
     game.start();
     // Shown after the map is up, so the first card sits over the player's own
@@ -180,6 +207,10 @@ async function boot(): Promise<void> {
       // run without a rebuild, which is what makes balancing a measurement job
       // rather than a guessing one. Behind the same dev-tools gate as the rest.
       tuning: TUNING,
+      // Exposed so the promise that matters most here -- that the reward is paid
+      // even when the ad fails -- can be re-tested at any time, rather than
+      // being checked once and then quietly rotting.
+      rewardedAd,
     };
   }
 }

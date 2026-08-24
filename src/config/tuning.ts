@@ -593,6 +593,17 @@ export const TUNING = {
      */
     invulnerableAfterHitSeconds: 0.4,
     /**
+     * Getting up again after watching an ad: how much room is cleared around
+     * you, and how long you are untouchable for.
+     *
+     * Both exist because handing somebody a full health bar while forty monsters
+     * are standing on them is not a second chance -- it is a second death, sold
+     * at the price of an advert. The crowd is swept away without dropping loot,
+     * so this buys time and never rewards dying.
+     */
+    reviveClearRadiusMetres: 26,
+    reviveGraceSeconds: 3,
+    /**
      * How close you must be to sweep something up.
      *
      * Loot does NOT fly to you any more, by request: you collect it by walking
@@ -731,5 +742,63 @@ export const TUNING = {
     lowFpsWarningThreshold: 40,
     /** How often the on-screen dev readout refreshes, in milliseconds. */
     devReadoutIntervalMs: 500,
+
+    /**
+     * How often the PLACEHOLDER ad pretends to fail, 0 to 1.
+     *
+     * MONETIZATION.md asks for the failure path to be exercised deliberately,
+     * because it carries the promise that matters most in this game's business
+     * model: the reward is paid whether or not the ad turns up. A path that is
+     * tested once and then never again is a path that quietly rots.
+     *
+     * Set to 0 to see the ordinary run of things, or 1 to watch every failure.
+     * A real ad network replaces all of this and supplies its own failures.
+     */
+    fakeAdFailureRate: 0.25,
+
+    /**
+     * LOW POWER MODE.
+     *
+     * This is a game you are asked to take on an hour's walk, which makes the
+     * battery a design constraint and not an afterthought: a game that strands
+     * somebody a mile from home with a dead phone has done real harm, and no
+     * amount of good combat makes up for it.
+     *
+     * Three things drain a phone here. The GPS chip, which we cannot turn down
+     * without breaking the entire game. The screen, which is not ours. And the
+     * drawing -- which is ours, and is the whole of what this section reduces.
+     *
+     * Every one of these is a CEILING, not a target. Nothing is made worse when
+     * the mode is off.
+     */
+    lowPower: {
+      /**
+       * Milliseconds between frames. 33 is thirty a second.
+       *
+       * Halving the frame rate roughly halves the drawing work, and the map
+       * library redraws only when we ask it to -- so this quietly halves ITS
+       * work too, which is the larger half. Thirty a second on a map that moves
+       * at walking pace is hard to tell from sixty.
+       */
+      frameIntervalMs: 33,
+      /**
+       * The swarm stops growing here rather than at `maxAlivePerNest`.
+       *
+       * Kept high enough that the fight is still the fight. Being told the game
+       * is "the cheap version" whenever you want your battery to last is a poor
+       * trade, and the number below is far past the point where a crowd reads as
+       * a crowd.
+       */
+      maxMonstersAlive: 150,
+      /** Pathfinding is rebuilt half as often. It costs about 4 ms each time. */
+      flowFieldIntervalMultiplier: 2,
+    },
+
+    /**
+     * Offer low power mode when the phone's battery falls below this fraction.
+     * Only Android tells us; iPhones keep it to themselves, so there the mode is
+     * still there, it simply has to be switched on by hand.
+     */
+    offerLowPowerBelowBattery: 0.25,
   },
 } as const;

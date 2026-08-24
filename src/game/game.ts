@@ -37,6 +37,8 @@ import { seededRandom } from '../world/determinism';
 import { bonusesFrom, costToBuy, META_UPGRADES, type MetaLevels } from './metaProgress';
 import { CHARACTERS, characterById } from './characters';
 import { bonusesFromEquipment, itemById } from './equipment';
+import { preloadAd, watchAdFor } from '../app/rewardedAd';
+import type { Journal } from '../app/journal';
 import type { Profile } from '../profile/profile';
 import { worldCellFor } from '../world/determinism';
 import { activeBasemap } from '../config/basemap';
@@ -135,11 +137,34 @@ export class Game {
    */
   tutorial: Tutorial | null = null;
 
+  /**
+   * Everything the player has banked THIS run, kept so the death screen can
+   * offer to double it. Coins themselves are banked the instant they are picked
+   * up -- losing a run must never lose money you walked over to collect.
+   */
+  private coinsThisRun = 0;
+  /** One revive per run. Two would make dying meaningless rather than costly. */
+  private revivedThisRun = false;
+
+  /**
+   * How far the player has actually walked this run, in metres.
+   *
+   * Measured between real GPS anchors rather than character positions, so it is
+   * genuinely footsteps. Recorded in the journal; the position itself never is.
+   */
+  private metresWalkedThisRun = 0;
+  /** The log, if there is one. */
+  journal: Journal | null = null;
+
   /** Which emoji the player is drawn as, decided by the chosen character. */
   playerSprite = 7;
 
+  /** Where full-screen things (the ad placeholder) are hung. */
+  private uiContainer: HTMLElement;
+
   constructor(map: MapLibreMap, uiContainer: HTMLElement, startAt: LatLng, useMirror = false) {
     this.map = map;
+    this.uiContainer = uiContainer;
     this.buildings = new BuildingSource(useMirror);
     this.layer = new EntityLayer(this.entities);
     this.camera = new GameCamera(map);
@@ -192,6 +217,11 @@ export class Game {
       nestsCleared: data.nestsCleared + 1,
     });
     this.hud.showNestCleared(reward, data.essence + reward);
+    this.journal?.record('nest-cleared', {
+      reward,
+      metresWalked: Math.round(this.metresWalkedThisRun),
+      runSeconds: Math.round(this.combat.runTimeSeconds),
+    });
   }
 
   /**
@@ -214,8 +244,67 @@ export class Game {
       (id) => this.buyUpgrade(id),
       (id) => this.chooseOrBuyCharacter(id),
       (id) => this.buyOrEquip(id),
+      this.lowPower,
+      (on) => {
+        this.setLowPower(on);
+        this.profile?.update({ lowPowerMode: on });
+        this.journal?.record('low-power', { on });
+        this.openShop();
+      },
+      this.journal?.summary() ?? 'nothing recorded yet',
+      () => this.exportJournal(),
       () => {}
     );
+  }
+
+  /**
+   * Hand the log to the player.
+   *
+   * Clipboard first, because on a phone a downloaded file is somewhere you then
+   * have to go and find. If the browser refuses -- some do, unless the tap is
+   * very fresh -- fall back to putting it on screen where it can be selected by
+   * hand. Never leaves the phone either way.
+   */
+  private exportJournal(): void {
+    if (!this.journal) return;
+    const text = this.journal.export();
+
+    navigator.clipboard?.writeText(text).then(
+      () => this.hud.showNote('Play log copied — ' + this.journal!.count() + ' entries'),
+      () => this.showJournalText(text)
+    );
+  }
+
+  private showJournalText(text: string): void {
+    const box = document.createElement('textarea');
+    box.value = text;
+    box.readOnly = true;
+    Object.assign(box.style, {
+      position: 'absolute',
+      inset: '8% 6%',
+      zIndex: '80',
+      padding: '12px',
+      borderRadius: '10px',
+      border: '1px solid rgba(255,255,255,0.18)',
+      background: '#0d1117',
+      color: '#9fb3c8',
+      font: '400 11px/1.5 ui-monospace, monospace',
+    } satisfies Partial<CSSStyleDeclaration>);
+    box.addEventListener('click', () => box.select());
+
+    const done = document.createElement('button');
+    done.textContent = 'Done';
+    done.style.cssText =
+      'position:absolute;bottom:3%;left:50%;transform:translateX(-50%);z-index:81;' +
+      'padding:11px 26px;border-radius:999px;border:1px solid rgba(255,255,255,0.2);' +
+      'background:rgba(13,17,23,0.95);color:#e6edf3;font:600 13px system-ui,sans-serif;cursor:pointer';
+    done.addEventListener('click', () => {
+      box.remove();
+      done.remove();
+    });
+
+    this.uiContainer.append(box, done);
+    box.select();
   }
 
   /**
@@ -311,18 +400,72 @@ export class Game {
       });
     }
 
+    this.journal?.record('run-ended', {
+      seconds: Math.round(this.combat.runTimeSeconds),
+      level: this.combat.level,
+      kills: this.combat.monstersKilled,
+      coins: this.coinsThisRun,
+      metresWalked: Math.round(this.metresWalkedThisRun),
+      character: this.profile?.get().selectedCharacter ?? 'wanderer',
+    });
+
     const minutes = Math.floor(this.combat.runTimeSeconds / 60);
     const seconds = Math.floor(this.combat.runTimeSeconds % 60);
     this.hud.showDeath(
       `Survived ${minutes}m ${seconds}s · level ${this.combat.level} · ${this.combat.monstersKilled} killed`,
-      () => this.restartRun()
+      () => this.restartRun(),
+      {
+        canRevive: !this.revivedThisRun,
+        coinsThisRun: this.coinsThisRun,
+        onRevive: () => this.watchAdToRevive(),
+        onDoubleCoins: () => this.watchAdToDoubleCoins(),
+      }
     );
+  }
+
+  /**
+   * The two ad offers. Both go through `watchAdFor`, which pays the reward on
+   * every path there is -- played, failed, closed early, or our own code
+   * throwing. See the note at the top of `rewardedAd.ts`.
+   */
+  private watchAdToRevive(): void {
+    this.revivedThisRun = true;
+    void watchAdFor(this.uiContainer, 'another go', () => {
+      this.journal?.record('ad', { placement: 'revive' });
+      const px = this.collision.toLocalX(this.character.lng);
+      const py = this.collision.toLocalY(this.character.lat);
+      this.combat.revive(px, py);
+    });
+  }
+
+  private watchAdToDoubleCoins(): void {
+    const owed = this.coinsThisRun;
+    // Zeroed before the ad rather than after, so a player who taps twice while
+    // it loads cannot be paid twice.
+    this.coinsThisRun = 0;
+    void watchAdFor(this.uiContainer, owed + ' coins', () => {
+      this.journal?.record('ad', { placement: 'double-coins', coins: owed });
+      if (this.profile) {
+        this.profile.update({ essence: this.profile.get().essence + owed });
+      }
+      this.restartRun();
+    });
   }
 
   /** Start a fresh run from where the player is standing. */
   restartRun(): void {
     this.loadout = freshLoadout();
     this.cardsTaken.clear();
+    this.coinsThisRun = 0;
+    this.revivedThisRun = false;
+    this.metresWalkedThisRun = 0;
+    this.journal?.record('run-started', {
+      character: this.profile?.get().selectedCharacter ?? 'wanderer',
+      lowPower: this.lowPower,
+    });
+    // Ask for the next ad now, long before anyone might want one. An ad that
+    // starts loading when the button is tapped shows a spinner instead.
+    preloadAd();
     // Whoever you chose to play as decides what you start holding and what
     // you are good at. This happens before permanent upgrades, so both stack.
     const hero = characterById(this.profile?.get().selectedCharacter ?? 'wanderer');
@@ -398,6 +541,7 @@ export class Game {
 
     this.running = true;
     this.lastFrameMs = performance.now();
+    this.watchVisibility();
     requestAnimationFrame(this.tick);
   }
 
@@ -443,6 +587,13 @@ export class Game {
   /** Tell the game where the player really is. Called by the location module. */
   setAnchor(anchor: LatLng): void {
     const first = this.anchor === null;
+    // Count the footsteps before replacing the old position. Jumps of more than
+    // a bus length are dropped: those are the GPS re-thinking where it is, not
+    // somebody sprinting, and counting them would flatter the numbers.
+    if (this.anchor) {
+      const step = distanceMetres(this.anchor, anchor);
+      if (step < 15) this.metresWalkedThisRun += step;
+    }
     this.anchor = anchor;
 
     if (first) {
@@ -540,8 +691,54 @@ export class Game {
   /* The loop                                                            */
   /* ------------------------------------------------------------------ */
 
+  /**
+   * LOW POWER MODE, and stopping dead when the screen is off.
+   *
+   * The second of those is not a setting and is never off. A phone in a pocket
+   * with the screen dark was, until now, still drawing sixty frames a second of
+   * a map nobody was looking at -- which is the single most wasteful thing this
+   * game could possibly do to somebody halfway through a walk.
+   */
+  lowPower = false;
+  /** Set by the browser when the game is hidden: pocket, lock, another app. */
+  private hidden = false;
+  /** When the next frame is allowed, used only while low power is on. */
+  private nextFrameDueMs = 0;
+
+  setLowPower(on: boolean): void {
+    this.lowPower = on;
+    this.combat.setMonsterCap(on ? TUNING.performance.lowPower.maxMonstersAlive : null);
+  }
+
+  private watchVisibility(): void {
+    document.addEventListener('visibilitychange', () => {
+      this.hidden = document.hidden;
+      // Coming back, forget how long we were away -- otherwise the first frame
+      // after unlocking is a twenty-minute step and everything teleports.
+      if (!this.hidden) this.lastFrameMs = performance.now();
+    });
+  }
+
   private tick = (nowMs: number): void => {
     if (!this.running) return;
+
+    // Nobody is looking. Keep the loop alive so we notice when they come back,
+    // but do no work at all.
+    if (this.hidden) {
+      requestAnimationFrame(this.tick);
+      return;
+    }
+
+    // Thirty frames a second instead of sixty. The map library only redraws
+    // when we ask it to, so skipping our frame skips its work as well -- and
+    // that is the larger half of the saving.
+    if (this.lowPower) {
+      if (nowMs < this.nextFrameDueMs) {
+        requestAnimationFrame(this.tick);
+        return;
+      }
+      this.nextFrameDueMs = nowMs + TUNING.performance.lowPower.frameIntervalMs;
+    }
 
     // Cap the step. If the phone is interrupted -- a notification, the screen
     // locking -- we could come back to a "frame" that lasted 30 seconds, and
@@ -632,7 +829,9 @@ export class Game {
     // every frame. One calculation serves every monster.
     if (
       this.collision.wallCount() > 0 &&
-      this.flowField.msSinceBuild(nowMs) > TUNING.navigation.recalculateEveryMs
+      this.flowField.msSinceBuild(nowMs) >
+        TUNING.navigation.recalculateEveryMs *
+          (this.lowPower ? TUNING.performance.lowPower.flowFieldIntervalMultiplier : 1)
     ) {
       this.flowField.update(
         this.collision.toLocalX(this.character.lng),
@@ -708,6 +907,7 @@ export class Game {
     if (this.combat.coinsCollected > 0 && this.profile) {
       const banked = this.combat.coinsCollected;
       this.combat.coinsCollected = 0;
+      this.coinsThisRun += banked;
       this.profile.update({ essence: this.profile.get().essence + banked });
     }
 

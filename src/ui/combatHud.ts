@@ -281,7 +281,27 @@ export class CombatHud {
     this.cardScreen.style.display = 'flex';
   }
 
-  showDeath(summary: string, onRestart: () => void): void {
+  /**
+   * The death screen, and the only two places an ad is ever offered.
+   *
+   * Both sit HERE, on a screen the player has already stopped playing on, behind
+   * buttons they choose to press. Nothing interrupts a run; the brief forbids
+   * interstitials outright, and quite apart from that, interrupting somebody who
+   * is walking down a real street is a genuinely bad thing to do.
+   *
+   * @param offers null when there is nothing to offer -- ads unavailable, or a
+   *               Premium player who is simply given these things.
+   */
+  showDeath(
+    summary: string,
+    onRestart: () => void,
+    offers: {
+      canRevive: boolean;
+      coinsThisRun: number;
+      onRevive: () => void;
+      onDoubleCoins: () => void;
+    } | null = null
+  ): void {
     this.deathScreen.innerHTML = '';
 
     const heading = document.createElement('div');
@@ -317,7 +337,52 @@ export class CombatHud {
       onRestart();
     });
 
-    this.deathScreen.append(heading, detail, button);
+    this.deathScreen.append(heading, detail);
+
+    if (offers) {
+      const offerStyle =
+        'width:min(320px,86vw);margin-bottom:9px;padding:12px 15px;border-radius:11px;' +
+        'border:1px solid rgba(250,204,21,0.32);background:rgba(250,204,21,0.09);' +
+        'color:#e6edf3;text-align:left;cursor:pointer;display:flex;gap:11px;align-items:center';
+
+      if (offers.canRevive) {
+        const revive = document.createElement('button');
+        revive.style.cssText = offerStyle;
+        revive.innerHTML =
+          '<span style="font-size:19px;width:24px;text-align:center">▶</span>' +
+          '<span style="flex:1">' +
+          '<span style="display:block;font:700 13px system-ui,sans-serif">Carry on this run</span>' +
+          '<span style="display:block;font:400 11.5px/1.35 system-ui,sans-serif;color:#9fb3c8">' +
+          'Watch a short ad. Saves walking all the way back out here.</span>' +
+          '</span>' +
+          '<span style="font:700 11px ui-monospace,monospace;color:#facc15">AD</span>';
+        revive.addEventListener('click', () => {
+          this.deathScreen.style.display = 'none';
+          offers.onRevive();
+        });
+        this.deathScreen.appendChild(revive);
+      }
+
+      if (offers.coinsThisRun > 0) {
+        const double = document.createElement('button');
+        double.style.cssText = offerStyle;
+        double.innerHTML =
+          '<span style="font-size:19px;width:24px;text-align:center">🪙</span>' +
+          '<span style="flex:1">' +
+          '<span style="display:block;font:700 13px system-ui,sans-serif">Double this run’s coins</span>' +
+          '<span style="display:block;font:400 11.5px/1.35 system-ui,sans-serif;color:#9fb3c8">' +
+          offers.coinsThisRun + ' → ' + offers.coinsThisRun * 2 + '. Reaches the same things sooner, never anything more.</span>' +
+          '</span>' +
+          '<span style="font:700 11px ui-monospace,monospace;color:#facc15">AD</span>';
+        double.addEventListener('click', () => {
+          this.deathScreen.style.display = 'none';
+          offers.onDoubleCoins();
+        });
+        this.deathScreen.appendChild(double);
+      }
+    }
+
+    this.deathScreen.appendChild(button);
     this.deathScreen.style.display = 'flex';
   }
 
@@ -383,6 +448,15 @@ ${data.distanceMetres.toFixed(0)} m`;
       : 'step back within ' + distanceMetres.toFixed(0) + ' m or progress fades';
   }
 
+  /** A plain one-line note in the same place as the nest message. */
+  showNote(text: string): void {
+    this.toast.innerHTML = '<div style="font:400 13px/1.5 system-ui,sans-serif">' + text + '</div>';
+    this.toast.style.display = 'block';
+    this.toast.style.opacity = '1';
+    setTimeout(() => (this.toast.style.opacity = '0'), 2200);
+    setTimeout(() => (this.toast.style.display = 'none'), 2700);
+  }
+
   /** A nest is gone. Say so, briefly and happily. */
   showNestCleared(reward: number, total: number): void {
     this.toast.innerHTML =
@@ -410,6 +484,10 @@ ${data.distanceMetres.toFixed(0)} m`;
     onBuy: (id: string) => void,
     onCharacter: (id: string) => void,
     onEquipment: (id: string) => void,
+    lowPower: boolean,
+    onLowPower: (on: boolean) => void,
+    journalSummary: string,
+    onExportJournal: () => void,
     onClose: () => void
   ): void {
     this.shopScreen.innerHTML = '';
@@ -585,6 +663,68 @@ ${data.distanceMetres.toFixed(0)} m`;
       }
       this.shopScreen.appendChild(button);
     }
+
+    // ----- settings ------------------------------------------------------
+    const settingsHeading = document.createElement('div');
+    settingsHeading.innerHTML =
+      '<div style="font:700 12px/1 ui-monospace,monospace;color:#c084fc;letter-spacing:0.14em">SETTINGS</div>';
+    settingsHeading.style.textAlign = 'center';
+    settingsHeading.style.margin = '18px 0 10px';
+    this.shopScreen.appendChild(settingsHeading);
+
+    const power = document.createElement('button');
+    Object.assign(power.style, {
+      width: 'min(340px, 88vw)',
+      marginBottom: '10px',
+      padding: '11px 14px',
+      borderRadius: '11px',
+      border: lowPower ? '1px solid rgba(74,222,128,0.8)' : '1px solid rgba(255,255,255,0.14)',
+      background: lowPower ? 'rgba(74,222,128,0.14)' : 'rgba(255,255,255,0.06)',
+      color: '#e6edf3',
+      textAlign: 'left',
+      cursor: 'pointer',
+      display: 'flex',
+      gap: '12px',
+      alignItems: 'center',
+    } satisfies Partial<CSSStyleDeclaration>);
+    power.innerHTML =
+      '<span style="font-size:20px;width:26px;text-align:center">🔋</span>' +
+      '<span style="flex:1">' +
+      '<span style="display:block;font:700 13px system-ui,sans-serif">Low power mode</span>' +
+      '<span style="display:block;font:400 11.5px/1.35 system-ui,sans-serif;color:#9fb3c8">' +
+      'Draws half as often and thins the swarm a little. For long walks.</span>' +
+      '</span>' +
+      '<span style="font:700 12px ui-monospace,monospace;color:' +
+      (lowPower ? '#4ade80' : '#5b6b7d') + '">' + (lowPower ? 'ON' : 'OFF') + '</span>';
+    power.addEventListener('click', () => onLowPower(!lowPower));
+    this.shopScreen.appendChild(power);
+
+    const log = document.createElement('button');
+    Object.assign(log.style, {
+      width: 'min(340px, 88vw)',
+      marginBottom: '10px',
+      padding: '11px 14px',
+      borderRadius: '11px',
+      border: '1px solid rgba(255,255,255,0.14)',
+      background: 'rgba(255,255,255,0.06)',
+      color: '#e6edf3',
+      textAlign: 'left',
+      cursor: 'pointer',
+      display: 'flex',
+      gap: '12px',
+      alignItems: 'center',
+    } satisfies Partial<CSSStyleDeclaration>);
+    log.innerHTML =
+      '<span style="font-size:20px;width:26px;text-align:center">📋</span>' +
+      '<span style="flex:1">' +
+      '<span style="display:block;font:700 13px system-ui,sans-serif">Copy my play log</span>' +
+      '<span style="display:block;font:400 11px/1.35 system-ui,sans-serif;color:#9fb3c8">' +
+      journalSummary + '</span>' +
+      '<span style="display:block;font:400 10.5px/1.3 system-ui,sans-serif;color:#5b6b7d;margin-top:2px">' +
+      'Stays on this phone. Contains no locations.</span>' +
+      '</span>';
+    log.addEventListener('click', () => onExportJournal());
+    this.shopScreen.appendChild(log);
 
     const close = document.createElement('button');
     close.textContent = 'Back to the street';
