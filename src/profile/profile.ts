@@ -56,6 +56,8 @@ export interface ProfileData {
   selectedCharacter: string;
   /** True once the game has been added to the phone's home screen. */
   installedToHomeScreen: boolean;
+  /** Which one-line hints have already been shown. Each is shown once, ever. */
+  hintsSeen: string[];
   /** Every piece of equipment bought so far, by id. */
   ownedEquipment: string[];
   /** Which item is worn in each of the three slots. Empty means nothing. */
@@ -84,6 +86,7 @@ function freshProfile(): ProfileData {
     ownedEquipment: [],
     equippedBySlot: {},
     installedToHomeScreen: false,
+    hintsSeen: [],
   };
 }
 

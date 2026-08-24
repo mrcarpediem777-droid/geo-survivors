@@ -680,6 +680,27 @@ would pin somebody to an old game permanently.
 of them; filling somebody's phone with a city's worth of map is not ours to do
 quietly. The browser keeps its own copies anyway.
 
+### `vercel.json` cannot have comments in it — a deploy died on this
+
+Every other file in this project explains itself in comments. `vercel.json` cannot:
+JSON has no comments, and Vercel checks the file against a strict list of allowed
+keys, so the usual dodge of adding a `"//"` key **fails the whole build**.
+
+What that looks like is nasty, because nothing appears to be wrong. The push
+succeeds, git is clean, the commit is on GitHub — and the live site quietly stays
+on the previous version. It was caught only because the new files 404'd when
+checked afterwards, which is the reason every deploy here ends with actually
+fetching something new from the live site rather than trusting that a green push
+means a green deploy.
+
+So the reasons for the settings in that file live here instead:
+
+| Setting | Why |
+|---|---|
+| `/service-worker.js` — never cached | If a phone keeps an old copy of the offline helper, it keeps an old copy of the *game*, forever, and nothing we deploy can reach that player. The file is 3 kB. |
+| `/index.html` — never cached | It names the current bundle. Cache it and you pin somebody to yesterday's build. |
+| `/icons/*` — cached a day | Their names never change, so a long cache would make a redrawn icon take weeks to appear. A day is useful and still fixable. |
+
 ### The icons are drawn by a script
 
 `node tools/make-icons.mjs` redraws all six sizes — a blue dot standing at a
@@ -687,6 +708,42 @@ street junction, which is what the game looks like. Change the numbers at the to
 of that file and run it again. It writes the PNG bytes itself with nothing but
 what Node already has, so there is no image editor to own and no picture in the
 repository that nobody can edit.
+
+---
+
+## Teaching the game (M6)
+
+The game does not look like what it is — it looks like a map. Nobody opening it
+has any reason to guess that the blue dot is them, that walking is the only way
+to move, or that they are not supposed to press anything. So there are two kinds
+of teaching, answering two different questions.
+
+**Four cards before the first run** answer *what is this?*: your street and the
+blue dot; everything fires by itself; walk over what drops; and — on its own
+card — **nothing here is ever timed and hurrying is never rewarded**. That last
+one is in the brief as a rule for us, but the promise is worth nothing if the
+player does not know it has been made: somebody who *suspects* the game might be
+timing them will hurry anyway, across a road, looking at a phone.
+
+**Four one-line hints** answer *what just happened?*, each shown once ever, at
+the moment the thing first occurs. Measured on a real street:
+
+```
+  0s  they are walking to you; your weapons fire on their own
+ 11s  loot stays where it fell — walk over it
+ 21s  those dark holes are nests, and they are where the coins come from
+ 79s  being crowded is what hurts — walk away, and you heal once they are off you
+```
+
+A fifth fires the first time a coin is picked up.
+
+**The nest hint originally never fired.** It waited until a nest was within 70 m
+— by which point the player had already walked most of the way to one, so the
+person who most needed it, the one standing still wondering what the game wants,
+never saw it at all. Nests are placed 70–420 m out; standing on a Da Nang street
+for a hundred seconds it did not appear once. It now fires at 200 m, while the
+nest is still just a marker on the edge of the screen, which is exactly when
+"what is that?" is being asked.
 
 ---
 

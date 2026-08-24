@@ -14,6 +14,7 @@
 
 import { TUNING } from './config/tuning';
 import { registerOfflineSupport, offerInstall } from './app/install';
+import { Tutorial } from './ui/tutorial';
 import { Profile } from './profile/profile';
 import { PlayerLocation } from './location/playerLocation';
 import { MapView } from './map/mapView';
@@ -132,8 +133,20 @@ async function boot(): Promise<void> {
   // two things steering one camera, which shows up as a hard jerk.
   mapView.handCameraToGame();
 
+  // 6b. THE TEACHER --------------------------------------------------------
+  // This game does not look like what it is -- it looks like a map. Nobody
+  // opening it has any reason to guess that the blue dot is them, that walking
+  // is the only way to move, or that they are not supposed to press anything.
+  const tutorial = new Tutorial(uiContainer, profile.get().hintsSeen, (hintsSeen, done) =>
+    profile.update({ hintsSeen, tutorialComplete: done })
+  );
+  game.tutorial = tutorial;
+
   void mapView.whenReady().then(() => {
     game.start();
+    // Shown after the map is up, so the first card sits over the player's own
+    // street rather than over a grey rectangle.
+    if (!profile.get().tutorialComplete) tutorial.showIntro();
   });
 
   // 7. START THE GPS -------------------------------------------------------

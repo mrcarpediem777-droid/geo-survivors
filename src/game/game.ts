@@ -31,6 +31,7 @@ import { addFallbackArena } from '../world/fallbackArena';
 import { FlowField } from '../world/flowField';
 import { Combat } from './combat';
 import { CombatHud } from '../ui/combatHud';
+import type { Tutorial } from '../ui/tutorial';
 import { freshLoadout, pickCards, type Loadout, type UpgradeCard } from './upgrades';
 import { seededRandom } from '../world/determinism';
 import { bonusesFrom, costToBuy, META_UPGRADES, type MetaLevels } from './metaProgress';
@@ -127,6 +128,12 @@ export class Game {
 
   /** Where permanent progress is kept. Set by main.ts right after construction. */
   profile: Profile | null = null;
+
+  /**
+   * The teacher, if there is one. Optional so the game can be built and tested
+   * without it, and so a player who has finished it carries no extra weight.
+   */
+  tutorial: Tutorial | null = null;
 
   /** Which emoji the player is drawn as, decided by the chosen character. */
   playerSprite = 7;
@@ -554,7 +561,10 @@ export class Game {
     const cameFromLat = this.character.lat;
 
     // Everything stops while a card is being chosen, or after death.
-    const paused = this.hud.isBlocking();
+    // The opening cards hold the world still. Without this, somebody reading
+    // "you move by walking" would already be losing health to a swarm they have
+    // not been told about yet.
+    const paused = this.hud.isBlocking() || (this.tutorial?.isBlocking() ?? false);
 
     // SAFETY CATCH. The world holds still while a card choice is open, so if
     // that flag is ever set without a screen actually on display, the game
@@ -647,6 +657,23 @@ export class Game {
 
       this.combat.update(deltaSeconds, px, py);
       this.combat.checkEnemyShots(px, py);
+
+      // Teach whatever is happening right now. A rule explained while you watch
+      // it happen sticks; the same rule in a wall of text at the start does not.
+      if (this.tutorial) {
+        let nearestNest: number | null = null;
+        for (const nest of this.combat.nests) {
+          const d = Math.hypot(nest.x - px, nest.y - py);
+          if (nearestNest === null || d < nearestNest) nearestNest = d;
+        }
+        this.tutorial.update(deltaSeconds, {
+          monstersAlive: this.combat.aliveMonsters(),
+          monstersKilled: this.combat.monstersKilled,
+          coinsCollected: this.combat.coinsCollected,
+          healthFraction: this.combat.health / this.combat.maxHealth,
+          nearestNestMetres: nearestNest,
+        });
+      }
     }
 
     // 4. Move the camera to follow, zooming in or out as combat starts or ends.
