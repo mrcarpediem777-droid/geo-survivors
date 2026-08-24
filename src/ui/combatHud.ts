@@ -488,6 +488,13 @@ ${data.distanceMetres.toFixed(0)} m`;
     onLowPower: (on: boolean) => void,
     journalSummary: string,
     onExportJournal: () => void,
+    audio: {
+      soundOn: boolean;
+      hapticsOn: boolean;
+      hapticsSupported: boolean;
+      onSound: (on: boolean) => void;
+      onHaptics: (on: boolean) => void;
+    },
     onClose: () => void
   ): void {
     this.shopScreen.innerHTML = '';
@@ -698,6 +705,60 @@ ${data.distanceMetres.toFixed(0)} m`;
       (lowPower ? '#4ade80' : '#5b6b7d') + '">' + (lowPower ? 'ON' : 'OFF') + '</span>';
     power.addEventListener('click', () => onLowPower(!lowPower));
     this.shopScreen.appendChild(power);
+
+    // A plain on/off row, reused for sound and vibration.
+    const toggle = (
+      glyph: string,
+      title: string,
+      note: string,
+      on: boolean,
+      onChange: (next: boolean) => void
+    ) => {
+      const row = document.createElement('button');
+      Object.assign(row.style, {
+        width: 'min(340px, 88vw)',
+        marginBottom: '10px',
+        padding: '11px 14px',
+        borderRadius: '11px',
+        border: on ? '1px solid rgba(74,222,128,0.8)' : '1px solid rgba(255,255,255,0.14)',
+        background: on ? 'rgba(74,222,128,0.14)' : 'rgba(255,255,255,0.06)',
+        color: '#e6edf3',
+        textAlign: 'left',
+        cursor: 'pointer',
+        display: 'flex',
+        gap: '12px',
+        alignItems: 'center',
+      } satisfies Partial<CSSStyleDeclaration>);
+      row.innerHTML =
+        '<span style="font-size:20px;width:26px;text-align:center">' + glyph + '</span>' +
+        '<span style="flex:1">' +
+        '<span style="display:block;font:700 13px system-ui,sans-serif">' + title + '</span>' +
+        '<span style="display:block;font:400 11.5px/1.35 system-ui,sans-serif;color:#9fb3c8">' +
+        note + '</span>' +
+        '</span>' +
+        '<span style="font:700 12px ui-monospace,monospace;color:' +
+        (on ? '#4ade80' : '#5b6b7d') + '">' + (on ? 'ON' : 'OFF') + '</span>';
+      row.addEventListener('click', () => onChange(!on));
+      this.shopScreen.appendChild(row);
+    };
+
+    toggle(
+      '🔊',
+      'Sound',
+      'Lets you play with the phone at your side instead of watching the screen.',
+      audio.soundOn,
+      audio.onSound
+    );
+
+    if (audio.hapticsSupported) {
+      toggle(
+        '📳',
+        'Vibration',
+        'Buzzes when you are hurt, when you level, and when a nest falls.',
+        audio.hapticsOn,
+        audio.onHaptics
+      );
+    }
 
     const log = document.createElement('button');
     Object.assign(log.style, {

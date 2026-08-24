@@ -58,6 +58,10 @@ export interface ProfileData {
   installedToHomeScreen: boolean;
   /** Which one-line hints have already been shown. Each is shown once, ever. */
   hintsSeen: string[];
+  /** Sound on. Default yes -- it is how you play without looking at the screen. */
+  soundOn: boolean;
+  /** Vibration. Default off: it costs battery and not everybody wants it. */
+  hapticsOn: boolean;
   /** Every piece of equipment bought so far, by id. */
   ownedEquipment: string[];
   /** Which item is worn in each of the three slots. Empty means nothing. */
@@ -87,6 +91,8 @@ function freshProfile(): ProfileData {
     equippedBySlot: {},
     installedToHomeScreen: false,
     hintsSeen: [],
+    soundOn: true,
+    hapticsOn: false,
   };
 }
 

@@ -39,6 +39,7 @@ import { CHARACTERS, characterById } from './characters';
 import { bonusesFromEquipment, itemById } from './equipment';
 import { preloadAd, watchAdFor } from '../app/rewardedAd';
 import type { Journal } from '../app/journal';
+import type { Sound, Haptics } from '../app/sound';
 import type { Profile } from '../profile/profile';
 import { worldCellFor } from '../world/determinism';
 import { activeBasemap } from '../config/basemap';
@@ -156,6 +157,17 @@ export class Game {
   /** The log, if there is one. */
   journal: Journal | null = null;
 
+  /** The noise, and the buzz. See `sound.ts` for why these are not decoration. */
+  private sound: Sound | null = null;
+  private haptics: Haptics | null = null;
+
+  useSound(sound: Sound, haptics: Haptics): void {
+    this.sound = sound;
+    this.haptics = haptics;
+    this.combat.sound = sound;
+    this.combat.haptics = haptics;
+  }
+
   /** Which emoji the player is drawn as, decided by the chosen character. */
   playerSprite = 7;
 
@@ -253,6 +265,23 @@ export class Game {
       },
       this.journal?.summary() ?? 'nothing recorded yet',
       () => this.exportJournal(),
+      {
+        soundOn: this.sound?.isEnabled() ?? false,
+        hapticsOn: this.haptics?.isEnabled() ?? false,
+        hapticsSupported: this.haptics?.isSupported() ?? false,
+        onSound: (on) => {
+          this.sound?.setEnabled(on);
+          this.profile?.update({ soundOn: on });
+          this.openShop();
+        },
+        onHaptics: (on) => {
+          this.haptics?.setEnabled(on);
+          this.profile?.update({ hapticsOn: on });
+          // Buzz once so the choice proves itself immediately.
+          if (on) this.haptics?.buzz(40, 0);
+          this.openShop();
+        },
+      },
       () => {}
     );
   }

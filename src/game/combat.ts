@@ -20,6 +20,7 @@ import type { CollisionWorld } from '../world/collision';
 import type { FlowField } from '../world/flowField';
 import { seededRandom } from '../world/determinism';
 import { TUNING } from '../config/tuning';
+import type { Sound, Haptics } from '../app/sound';
 import { WeaponId, type Loadout } from './upgrades';
 
 /** How big each square of the monster-crowding grid is, in metres. */
@@ -57,6 +58,13 @@ export class Combat {
   private collision: CollisionWorld;
   private flowField: FlowField;
   private events: CombatEvents;
+
+  /**
+   * The noise. Optional so the fight can be simulated headlessly without it,
+   * which is how nearly every number in TUNING.md was measured.
+   */
+  sound: Sound | null = null;
+  haptics: Haptics | null = null;
 
   /* --- the player --- */
   health: number = TUNING.player.maxHealth;
@@ -99,6 +107,10 @@ export class Combat {
   private pressureDamageThisFrame = 0;
   /** Seconds left before healing resumes. Reset by every scratch. */
   private regenPausedFor = 0;
+  /** Counts down to the next low-health warning. */
+  private dangerCountdown = 0;
+  /** Damage taken since the last "you are being hurt" sound. */
+  private hurtSincePlayed = 0;
 
   /** Money picked up this run, waiting to be banked. */
   coinsCollected = 0;
@@ -331,6 +343,8 @@ export class Combat {
     this.awaitingCardChoice = false;
     this.pendingLevelUps = 0;
     this.regenPausedFor = 0;
+    this.hurtSincePlayed = 0;
+    this.dangerCountdown = 0;
     this.dead = false;
   }
 
@@ -373,6 +387,24 @@ export class Combat {
     this.fireWeapons(deltaSeconds, playerX, playerY);
     this.updateProjectiles(deltaSeconds);
     this.updateOrbs(deltaSeconds, playerX, playerY);
+
+    // THE WARNING THAT MATTERS MOST, and the reason any of this exists.
+    //
+    // Below a third of your health, a slow ugly pulse and a buzz, roughly once a
+    // second. Somebody walking with the phone at their side is told "you are in
+    // trouble, walk away" without having to look down -- which is the whole
+    // point, because looking down while crossing a road is the one thing this
+    // game must never make anybody do.
+    if (this.health < this.maxHealth * 0.33 && !this.dead) {
+      this.dangerCountdown -= deltaSeconds;
+      if (this.dangerCountdown <= 0) {
+        this.dangerCountdown = 1.1;
+        this.sound?.play('danger');
+        this.haptics?.buzz([25, 90, 25], 900);
+      }
+    } else {
+      this.dangerCountdown = 0;
+    }
 
     // A slow trickle of healing, so one careless moment is not permanent --
     // but only once nothing is pressing on you. See the tuning file: healing
@@ -550,6 +582,8 @@ export class Combat {
       }
     }
 
+    this.sound?.play('nestCleared');
+    this.haptics?.buzz([40, 50, 40, 50, 120], 0);
     this.events.onNestCleared(reward);
   }
 
@@ -867,12 +901,14 @@ export class Combat {
           if (weapon.cooldown <= 0) {
             weapon.cooldown = 3.4 / this.loadout.fireRateMultiplier;
             this.firePulse(weapon.level, playerX, playerY);
+            this.sound?.play('shot');
           }
           continue;
 
         default:
           if (weapon.cooldown <= 0) {
             const fired = this.fireAimedWeapon(weapon.id, weapon.level, playerX, playerY);
+            if (fired) this.sound?.play('shot');
             weapon.cooldown = fired
               ? this.intervalFor(weapon.id) / this.loadout.fireRateMultiplier
               : 0.15; // nothing in range: check again shortly
@@ -1185,7 +1221,12 @@ export class Combat {
     const store = this.entities;
     store.health[id] -= damage;
     store.hitFlash[id] = TUNING.monsters.hitFlashSeconds;
-    if (store.health[id] <= 0) this.killMonster(id, true);
+    if (store.health[id] <= 0) {
+      this.killMonster(id, true);
+      this.sound?.play('kill');
+    } else {
+      this.sound?.play('hit');
+    }
   }
 
   private killMonster(id: EntityId, dropXp: boolean): void {
@@ -1251,6 +1292,23 @@ export class Combat {
     this.health -= taken;
     this.regenPausedFor = TUNING.player.regenPausedAfterHurtSeconds;
 
+    // Loud, ugly and unmistakable -- and a buzz, so somebody walking with the
+    // phone at their side finds out without looking at it.
+    //
+    // ADDED UP OVER TIME, NOT PER FRAME. My first version played this whenever a
+    // single frame took more than three points, which sounded reasonable and was
+    // completely wrong: damage arrives as a drizzle, at most about two points in
+    // a frame even with the swarm on top of you. Measured across a run that
+    // ended in death, the sound played EXACTLY ZERO TIMES. A crowd grinding you
+    // down from full health to nothing made no noise at all, which defeats the
+    // entire purpose of having sound in a game you play without looking.
+    this.hurtSincePlayed += taken;
+    if (this.hurtSincePlayed >= 8) {
+      this.hurtSincePlayed = 0;
+      this.sound?.play('hurt');
+      this.haptics?.buzz(45);
+    }
+
     // Only a real hit triggers the grace period, not the steady graze of a
     // crowd -- otherwise standing in a swarm would be free.
     if (taken > 3) this.invulnerableFor = TUNING.player.invulnerableAfterHitSeconds;
@@ -1258,6 +1316,8 @@ export class Combat {
     if (this.health <= 0 && !this.dead) {
       this.health = 0;
       this.dead = true;
+      this.sound?.play('death');
+      this.haptics?.buzz([90, 60, 200], 0);
       this.events.onDeath();
     }
   }
@@ -1310,8 +1370,14 @@ export class Combat {
           store.lat[id] = this.collision.toLat(y + (dy / distance) * pull);
           continue;
         }
-        if (kind === EntityKind.COIN) this.coinsCollected += store.value[id];
-        else this.gainXp(store.value[id]);
+        if (kind === EntityKind.COIN) {
+          this.coinsCollected += store.value[id];
+          this.sound?.play('coin');
+        }
+        else {
+          this.gainXp(store.value[id]);
+          this.sound?.play('xp');
+        }
         store.release(id);
       }
     }
@@ -1343,6 +1409,8 @@ export class Combat {
     if (this.awaitingCardChoice || this.pendingLevelUps <= 0) return;
     this.pendingLevelUps--;
     this.awaitingCardChoice = true;
+    this.sound?.play('levelUp');
+    this.haptics?.buzz([30, 40, 60], 0);
     this.events.onLevelUp(this.level);
   }
 

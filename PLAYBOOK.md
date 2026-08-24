@@ -10,7 +10,7 @@ Claude: *"Read PLAYBOOK.md and tell me where we left off."*
 | | |
 |---|---|
 | **Milestone reached** | **M5 — clearing nests and permanent progress** ✅ |
-| **Next milestone** | M6 complete — installable app, tutorial, low power, ads placeholder, play log |
+| **Next milestone** | M7 — sound and vibration, so the game can be played without looking at it |
 | **Code lives at** | https://github.com/mrcarpediem777-droid/geo-survivors |
 | **Live URL** | **https://geo-survivors.vercel.app** |
 | **Vercel dashboard** | https://vercel.com/abc-70f4/geo-survivors |
@@ -803,6 +803,59 @@ enough to balance a game and useless to anybody who steals it.
 It never leaves the phone — there is no server and no request is made. "Copy my
 play log" in SETTINGS puts it on the clipboard, and if the browser refuses the
 clipboard it goes on screen to be selected by hand.
+
+---
+
+## Sound and vibration (M7) — a safety feature, not decoration
+
+This game is played **while walking down a real street**, and until now the only
+way to know anything at all was to look at the screen: the health bar, the
+markers, the numbers. That quietly turns "go for a walk" into "stare at a phone
+near traffic", which is the exact behaviour the brief spends an entire rule
+trying to prevent.
+
+So sound exists here to let somebody hold the phone at their side and still know
+what is happening. Being hurt sounds like being hurt. A nest falling is
+unmistakable. Below a third of your health there is a slow ugly pulse roughly
+once a second that means *walk away* — the one decision this game actually wants
+you to make, delivered without asking anyone to look down.
+
+**No sound files.** Every noise is made by the browser out of arithmetic —
+nothing to download, nothing to wait for on bad signal, nothing added to the
+size of the game, and each sound is a row of numbers in `sound.ts` rather than a
+file that needs a program to edit.
+
+**Vibration** is the other half, and is off unless switched on: it costs battery
+and irritates when overused, so it is reserved for being hurt, levelling, and a
+nest falling. iOS does not support it at all and never has, so the toggle simply
+does not appear there rather than promising something that will not happen.
+
+### The most important sound never played once
+
+Measured across a full run that ended in death: the "you are being hurt" sound
+fired **exactly zero times**. The condition was "more than three points of damage
+in one frame", which sounds reasonable and is completely wrong — damage arrives
+as a drizzle, at most about two points a frame even with the swarm on top of you.
+A crowd grinding somebody from full health to nothing made no noise whatsoever,
+which defeats the entire purpose of having sound in a game played without
+looking.
+
+It now adds damage up over time and speaks every eight points. Same run,
+measured again: first warning at **20 s**, then 24 times across 101 seconds —
+which tracks the health slope exactly, getting more insistent as things get
+worse.
+
+### The mix, measured over one run
+
+```
+shot 135   hit 94   kill 41   hurt 24   xp 13   danger 6   levelUp 1   coin 1   death 1
+```
+
+Anything that can happen many times a second is throttled to three per tenth of a
+second — forty monsters dying on the same millisecond is not forty times as loud,
+it is a bang, and on some phones a distorted one. The rare and important sounds
+were checked against that throttle and **all of them got through**: every
+`danger`, every `hurt`, the level, the coin, the death.
 
 ---
 
