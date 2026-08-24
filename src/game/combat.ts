@@ -535,12 +535,23 @@ export class Combat {
       TUNING.nests.startingSpawnIntervalSeconds +
       (TUNING.nests.fastestSpawnIntervalSeconds - TUNING.nests.startingSpawnIntervalSeconds) * eased;
 
-    // A nest being destroyed fights back. This is the "hold position under heavy
-    // attack" the brief asks for -- and it is why clearing one is a decision
-    // rather than an errand.
-    return nest.beingCaptured
-      ? interval / TUNING.capture.spawnMultiplierWhileCapturing
-      : interval;
+    // A nest being destroyed fights back, HARDER AS IT DIES.
+    //
+    // This used to be a flat multiplier applied from the first second, which
+    // made clearing your first nest impossible. Measured on a Da Nang street: a
+    // fresh player walks 97 m to a nest -- a real minute of walking outdoors --
+    // arrives with 82% health, reaches 8% progress, and is DEAD FIVE SECONDS
+    // LATER, having achieved nothing at all. That is the headline mechanic of
+    // the game and the only way to earn money in it.
+    //
+    // The comment above this code always said "it fights hardest at the end".
+    // The code did not do that. It does now: the swarm starts at the ordinary
+    // rate and works up to the full multiplier as the nest dies, so arriving is
+    // survivable, the last stretch is the hard part, and stepping back to breathe
+    // costs only the gentle decay rather than your life.
+    if (!nest.beingCaptured) return interval;
+    const ramp = 1 + (TUNING.capture.spawnMultiplierWhileCapturing - 1) * nest.captureProgress;
+    return interval / ramp;
   }
 
   /** A nest is finished. Pay out, remove it, and let a new one rise elsewhere. */
@@ -891,6 +902,20 @@ export class Combat {
       weapon.cooldown -= deltaSeconds;
 
       switch (weapon.id) {
+        case WeaponId.MAELSTROM:
+          // The grown-up orbit: a much wider storm, cutting far more at once.
+          weapon.spin += deltaSeconds * 3.0;
+          this.tickOrbit(weapon.level, weapon.spin, playerX, playerY, deltaSeconds, true);
+          continue;
+
+        case WeaponId.BULWARK:
+          if (weapon.cooldown <= 0) {
+            weapon.cooldown = 3.0 / this.loadout.fireRateMultiplier;
+            this.fireBulwark(weapon.level, playerX, playerY);
+            this.sound?.play('shot');
+          }
+          continue;
+
         case WeaponId.ORBIT:
           // Not a projectile at all: blades that live around you permanently.
           weapon.spin += deltaSeconds * 2.2;
@@ -920,6 +945,11 @@ export class Combat {
   private intervalFor(id: string): number {
     if (id === WeaponId.SCATTER) return 1.1;
     if (id === WeaponId.LANCE) return 1.7;
+    if (id === WeaponId.FLECHETTE) return 1.25;
+    // Slower than the lance it grew from. An evolution that is simply better in
+    // every direction is not a decision, and this one is paid for in rhythm.
+    if (id === WeaponId.RAILSPIKE) return 2.1;
+    if (id === WeaponId.FUSILLADE) return TUNING.weapons.startingBoltIntervalSeconds * 1.15;
     return TUNING.weapons.startingBoltIntervalSeconds;
   }
 
@@ -927,6 +957,9 @@ export class Combat {
     const base = TUNING.weapons.startingBoltRangeMetres;
     if (id === WeaponId.SCATTER) return base * 0.55;
     if (id === WeaponId.LANCE) return base * 1.35;
+    if (id === WeaponId.FLECHETTE) return base * 0.8;
+    if (id === WeaponId.RAILSPIKE) return base * 1.6;
+    if (id === WeaponId.FUSILLADE) return base * 1.05;
     return base;
   }
 
@@ -963,7 +996,42 @@ export class Combat {
     const aimY = dy / distance;
 
     const damage = this.damageFor(id, level) * this.loadout.damageMultiplier;
-    const pierce = this.loadout.pierce + (id === WeaponId.LANCE ? 4 + level : 0);
+    const pierce =
+      this.loadout.pierce +
+      (id === WeaponId.LANCE ? 4 + level : 0) +
+      // Railspike stops for nothing at all; Flechette needles punch through a
+      // good few. Both are the point of the evolution rather than a bonus.
+      (id === WeaponId.RAILSPIKE ? 999 : 0) +
+      (id === WeaponId.FLECHETTE ? 5 : 0);
+
+    if (id === WeaponId.FUSILLADE) {
+      // Stops choosing. Fires one bolt at each of the nearest handful at once,
+      // which is what "+1 projectile, three times over" was always gesturing at.
+      const targets = this.nearestMonsters(playerX, playerY, range, 5 + this.loadout.extraProjectiles);
+      for (const other of targets) {
+        const ox = this.collision.toLocalX(store.lng[other]) - playerX;
+        const oy = this.collision.toLocalY(store.lat[other]) - playerY;
+        const d = Math.hypot(ox, oy) || 1;
+        this.spawnPlayerShot(
+          playerX, playerY, ox / d, oy / d, damage, pierce, range,
+          TUNING.weapons.startingBoltSpeedMps
+        );
+      }
+      return targets.length > 0;
+    }
+
+    if (id === WeaponId.FLECHETTE) {
+      // A full ring rather than a cone: the scattergun's weakness was having a
+      // back, and this is what removes it.
+      const shots = 12 + this.loadout.extraProjectiles * 2;
+      for (let i = 0; i < shots; i++) {
+        const angle = (i / shots) * Math.PI * 2;
+        this.spawnPlayerShot(
+          playerX, playerY, Math.cos(angle), Math.sin(angle), damage, pierce, range, 40
+        );
+      }
+      return true;
+    }
 
     if (id === WeaponId.SCATTER) {
       const shots = 4 + level + this.loadout.extraProjectiles;
@@ -999,6 +1067,9 @@ export class Combat {
     const base = TUNING.weapons.startingBoltDamage;
     if (id === WeaponId.SCATTER) return base * 0.55 * (1 + (level - 1) * 0.3);
     if (id === WeaponId.LANCE) return base * 1.5 * (1 + (level - 1) * 0.35);
+    if (id === WeaponId.FLECHETTE) return base * 0.7 * (1 + (level - 1) * 0.3);
+    if (id === WeaponId.RAILSPIKE) return base * 3.2 * (1 + (level - 1) * 0.4);
+    if (id === WeaponId.FUSILLADE) return base * 0.85 * (1 + (level - 1) * 0.32);
     return base * (1 + (level - 1) * 0.32);
   }
 
@@ -1020,17 +1091,47 @@ export class Combat {
     spin: number,
     playerX: number,
     playerY: number,
-    deltaSeconds: number
+    deltaSeconds: number,
+    evolved = false
   ): void {
     const blades = 2 + level;
-    const reach = Math.min(14 * this.loadout.rangeMultiplier, TUNING.weapons.maxRangeMetres);
+    const baseReach = evolved ? 24 : 14;
+    const reach = Math.min(baseReach * this.loadout.rangeMultiplier, TUNING.weapons.maxRangeMetres);
     const damage =
-      TUNING.weapons.startingBoltDamage * 1.6 * blades * this.loadout.damageMultiplier * deltaSeconds;
+      TUNING.weapons.startingBoltDamage *
+      (evolved ? 2.3 : 1.6) *
+      blades *
+      this.loadout.damageMultiplier *
+      deltaSeconds;
 
     // `spin` only drives how it will be drawn later; the cutting is the circle.
     void spin;
 
-    this.damageMonstersAround(playerX, playerY, reach, damage, blades * (1 + level));
+    const targets = blades * (1 + level) * (evolved ? 2 : 1);
+    this.damageMonstersAround(playerX, playerY, reach, damage, targets);
+  }
+
+  /**
+   * The grown-up shockwave: wider, and it feeds you.
+   *
+   * The healing is what makes it worth giving up the plain pulse for, and it is
+   * deliberately tied to how many monsters it CATCHES rather than being a flat
+   * amount -- so it rewards standing in the thick of it, which is the fantasy
+   * the parent weapon was already selling. Capped, because the same "defence
+   * that scales with the crowd" mistake made a standing player immortal once
+   * before and is not being made twice.
+   */
+  private fireBulwark(level: number, playerX: number, playerY: number): void {
+    const radius = Math.min(
+      (20 + level * 3.5) * this.loadout.rangeMultiplier,
+      TUNING.weapons.maxRangeMetres
+    );
+    const damage =
+      TUNING.weapons.startingBoltDamage * (1.6 + level * 0.55) * this.loadout.damageMultiplier;
+    const caught = this.damageMonstersAround(playerX, playerY, radius, damage, 10 + level * 6);
+
+    const healed = Math.min(caught * 1.5, 18);
+    this.health = Math.min(this.maxHealth, this.health + healed);
   }
 
   /** A ring of force pushing out of the player. */
@@ -1059,7 +1160,7 @@ export class Combat {
     radius: number,
     damage: number,
     maxTargets: number
-  ): void {
+  ): number {
     const store = this.entities;
     const radiusSquared = radius * radius;
     let hit = 0;
@@ -1072,6 +1173,37 @@ export class Combat {
       this.hurtMonster(id, damage);
       hit++;
     }
+    return hit;
+  }
+
+  /**
+   * The nearest few, for weapons that stop choosing one.
+   *
+   * Scans once and keeps a short sorted list rather than sorting everything --
+   * there can be four hundred monsters alive and this runs several times a
+   * second.
+   */
+  private nearestMonsters(x: number, y: number, withinMetres: number, howMany: number): EntityId[] {
+    const store = this.entities;
+    const limit = withinMetres * withinMetres;
+    const best: { id: EntityId; d: number }[] = [];
+
+    for (let id = 0; id < store.usedSlots; id++) {
+      if (!store.alive[id] || store.kind[id] !== EntityKind.MONSTER) continue;
+      const dx = this.collision.toLocalX(store.lng[id]) - x;
+      const dy = this.collision.toLocalY(store.lat[id]) - y;
+      const d = dx * dx + dy * dy;
+      if (d > limit) continue;
+
+      if (best.length < howMany) {
+        best.push({ id, d });
+        best.sort((a, b) => a.d - b.d);
+      } else if (d < best[best.length - 1].d) {
+        best[best.length - 1] = { id, d };
+        best.sort((a, b) => a.d - b.d);
+      }
+    }
+    return best.map((b) => b.id);
   }
 
   private nearestMonster(x: number, y: number, withinMetres: number): EntityId {

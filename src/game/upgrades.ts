@@ -27,6 +27,13 @@ export const WeaponId = {
   ORBIT: 'orbit',
   PULSE: 'pulse',
   LANCE: 'lance',
+
+  /* --- what they become. See EVOLUTIONS below. --- */
+  FUSILLADE: 'fusillade',
+  FLECHETTE: 'flechette',
+  MAELSTROM: 'maelstrom',
+  BULWARK: 'bulwark',
+  RAILSPIKE: 'railspike',
 } as const;
 
 export type WeaponIdValue = (typeof WeaponId)[keyof typeof WeaponId];
@@ -82,6 +89,95 @@ export function freshLoadout(): Loadout {
   };
 }
 
+/**
+ * EVOLUTIONS — where the depth actually comes from.
+ * =================================================
+ * The brief is explicit: the joystick is the only input, every weapon fires
+ * itself, and **depth comes only from level-up cards**. Up to now that promise
+ * was thin, because the cards were mostly percentages. Taking "+22% damage"
+ * three times is not a decision, it is arithmetic.
+ *
+ * An evolution needs a WEAPON you have invested in and a PASSIVE you have
+ * invested in, together. That turns every passive card into a question -- do I
+ * take the third Split Shot because the numbers are good, or because it turns my
+ * bolt into something else entirely? -- and it means two players holding the
+ * same weapon can end a run holding different things.
+ *
+ * Each one REPLACES its parent rather than stacking beside it, so a kit stays
+ * readable and the four-weapon limit still means something.
+ */
+export interface Evolution {
+  /** The weapon that grows up. */
+  from: WeaponIdValue;
+  /** What it becomes. */
+  to: WeaponIdValue;
+  /** The passive card that has to have been taken, and how often. */
+  passiveId: string;
+  passiveTimes: number;
+  /** How many levels of the base weapon are needed first. */
+  weaponLevel: number;
+  title: string;
+  description: string;
+  glyph: string;
+}
+
+export const EVOLUTIONS: Evolution[] = [
+  {
+    from: WeaponId.BOLT,
+    to: WeaponId.FUSILLADE,
+    passiveId: 'multishot',
+    passiveTimes: 3,
+    weaponLevel: 4,
+    title: 'Fusillade',
+    description: 'Your bolt stops picking one target and fires at five at once.',
+    glyph: '⁙',
+  },
+  {
+    from: WeaponId.SCATTER,
+    to: WeaponId.FLECHETTE,
+    passiveId: 'pierce',
+    passiveTimes: 3,
+    weaponLevel: 4,
+    title: 'Flechette Storm',
+    description: 'The spray becomes a full ring of needles that punch through everything.',
+    glyph: '✳',
+  },
+  {
+    from: WeaponId.ORBIT,
+    to: WeaponId.MAELSTROM,
+    passiveId: 'range',
+    passiveTimes: 3,
+    weaponLevel: 4,
+    title: 'Maelstrom',
+    description: 'The blades widen into a storm you stand in the middle of.',
+    glyph: '❋',
+  },
+  {
+    from: WeaponId.PULSE,
+    to: WeaponId.BULWARK,
+    passiveId: 'armour',
+    passiveTimes: 3,
+    weaponLevel: 4,
+    title: 'Bulwark',
+    description: 'The shockwave grows, and every monster it catches gives you back a little health.',
+    glyph: '⊛',
+  },
+  {
+    from: WeaponId.LANCE,
+    to: WeaponId.RAILSPIKE,
+    passiveId: 'damage',
+    passiveTimes: 3,
+    weaponLevel: 4,
+    title: 'Railspike',
+    description: 'One enormous bolt that stops for nothing and reaches as far as you can see.',
+    glyph: '⇑',
+  },
+];
+
+export function evolutionFor(id: WeaponIdValue): Evolution | undefined {
+  return EVOLUTIONS.find((e) => e.to === id);
+}
+
 export interface UpgradeCard {
   id: string;
   /** Shown on the card. */
@@ -94,8 +190,17 @@ export interface UpgradeCard {
   isWeapon: boolean;
   /** How many times this can be taken. */
   maxTimes: number;
-  /** Can it be offered right now? */
-  available: (loadout: Loadout) => boolean;
+  /**
+   * Can it be offered right now?
+   *
+   * Takes the tally of what has already been taken as well as the loadout,
+   * because an evolution depends on a PASSIVE having been picked several times
+   * -- and a passive leaves no trace in the loadout beyond a multiplier that
+   * several different cards could have produced.
+   */
+  available: (loadout: Loadout, taken: Map<string, number>) => boolean;
+  /** Evolutions are rare and loud; they jump the queue when they are possible. */
+  isEvolution?: boolean;
   apply: (loadout: Loadout) => void;
 }
 
@@ -122,6 +227,22 @@ export const UPGRADE_CARDS: UpgradeCard[] = [
   /* ---------------------------------------------------------------- */
   /* WEAPONS -- these change what the fight looks like                  */
   /* ---------------------------------------------------------------- */
+  {
+    /*
+     * The starting weapon had no card of its own, so it could never be improved
+     * except by passives -- and the Fusillade evolution, which needs it at level
+     * four, was therefore unreachable by anybody, ever. Caught by trying to
+     * measure how long an evolution takes and finding one that could not happen.
+     */
+    id: 'bolt',
+    title: 'Heavier Bolt',
+    description: 'The bolt you start with hits harder and reaches further. Plain, and always useful.',
+    glyph: '•',
+    isWeapon: true,
+    maxTimes: 5,
+    available: (l) => canTakeWeapon(l, WeaponId.BOLT),
+    apply: (l) => addOrLevel(l, WeaponId.BOLT),
+  },
   {
     id: 'scatter',
     title: 'Scattergun',
@@ -297,6 +418,36 @@ export const UPGRADE_CARDS: UpgradeCard[] = [
   },
 ];
 
+/*
+ * The evolution cards, built from the table at the top of this file so the two
+ * can never drift apart.
+ *
+ * They replace the parent weapon rather than adding to the kit, and they keep
+ * whatever level it had reached -- losing that investment would make taking one
+ * feel like a punishment.
+ */
+for (const evo of EVOLUTIONS) {
+  UPGRADE_CARDS.push({
+    id: 'evolve-' + evo.to,
+    title: evo.title,
+    description: evo.description,
+    glyph: evo.glyph,
+    isWeapon: true,
+    isEvolution: true,
+    maxTimes: 1,
+    available: (loadout, taken) => {
+      const held = loadout.weapons.find((w) => w.id === evo.from);
+      if (!held || held.level < evo.weaponLevel) return false;
+      return (taken.get(evo.passiveId) ?? 0) >= evo.passiveTimes;
+    },
+    apply: (loadout) => {
+      const held = loadout.weapons.find((w) => w.id === evo.from);
+      if (!held) return;
+      held.id = evo.to;
+    },
+  });
+}
+
 /**
  * Choose which cards to offer at a level-up.
  *
@@ -311,10 +462,14 @@ export function pickCards(
   random: () => number
 ): UpgradeCard[] {
   const eligible = UPGRADE_CARDS.filter(
-    (card) => (taken.get(card.id) ?? 0) < card.maxTimes && card.available(loadout)
+    (card) => (taken.get(card.id) ?? 0) < card.maxTimes && card.available(loadout, taken)
   );
 
   const weightOf = (card: UpgradeCard): number => {
+    // An evolution is the pay-off for a run's worth of decisions. Making
+    // somebody wait for it to come up at random would turn the best moment in
+    // the game into a lottery, so the moment it is possible it is offered.
+    if (card.isEvolution) return 40;
     if (!card.isWeapon) return 1;
     // Strongly favour weapons while the player is still assembling a kit.
     const held = loadout.weapons.length;

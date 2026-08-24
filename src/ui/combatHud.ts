@@ -252,10 +252,18 @@ export class CombatHud {
         width: 'min(340px, 88vw)',
         padding: '13px 15px',
         borderRadius: '12px',
-        border: card.isWeapon
-          ? '1px solid rgba(90,200,255,0.55)'
-          : '1px solid rgba(255,255,255,0.16)',
-        background: card.isWeapon ? 'rgba(90,200,255,0.10)' : 'rgba(255,255,255,0.06)',
+        // An evolution is the pay-off for a whole run of decisions, so it must
+        // not look like the fifth "+22% damage" card of the session.
+        border: card.isEvolution
+          ? '1px solid rgba(250,204,21,0.75)'
+          : card.isWeapon
+            ? '1px solid rgba(90,200,255,0.55)'
+            : '1px solid rgba(255,255,255,0.16)',
+        background: card.isEvolution
+          ? 'rgba(250,204,21,0.13)'
+          : card.isWeapon
+            ? 'rgba(90,200,255,0.10)'
+            : 'rgba(255,255,255,0.06)',
         color: '#e6edf3',
         textAlign: 'left',
         cursor: 'pointer',
@@ -267,6 +275,7 @@ export class CombatHud {
       button.innerHTML = `
         <span style="font-size:24px;line-height:1;width:28px;text-align:center;opacity:0.9">${card.glyph}</span>
         <span style="flex:1">
+          ${card.isEvolution ? '<span style="display:block;font:700 10px ui-monospace,monospace;color:#facc15;letter-spacing:0.16em;margin-bottom:3px">EVOLUTION</span>' : ''}
           <span style="display:block;font:700 14px system-ui,sans-serif;margin-bottom:3px">${card.title}</span>
           <span style="display:block;font:400 12px/1.35 system-ui,sans-serif;color:#9fb3c8">${card.description}</span>
         </span>`;

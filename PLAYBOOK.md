@@ -859,6 +859,89 @@ were checked against that throttle and **all of them got through**: every
 
 ---
 
+## Weapon evolutions (M7), and two things measurement caught underneath them
+
+Your brief says depth comes **only** from level-up cards. That promise was thin,
+because the cards were mostly percentages — taking "+22% damage" three times is
+not a decision, it is arithmetic. An **evolution** needs a weapon you have
+invested in and a passive you have invested in, *together*: four levels of the
+weapon and three takes of one specific card. Then a gold card appears and the
+weapon becomes something else.
+
+| Weapon | plus | becomes |
+|---|---|---|
+| Bolt | Split Shot ×3 | **Fusillade** — stops choosing, fires at five things at once |
+| Scattergun | Punch Through ×3 | **Flechette Storm** — a full ring of needles, no back |
+| Orbiting Shards | Far Sight ×3 | **Maelstrom** — a storm you stand inside |
+| Shockwave | Thick Skin ×3 | **Bulwark** — wider, and every monster caught feeds you |
+| Piercing Lance | Sharpened ×3 | **Railspike** — stops for nothing, reaches as far as you see |
+
+### One evolution could never have happened
+
+The Fusillade needs the bolt at level four — and **the bolt had no card**. It was
+the weapon everybody starts with and the only one that could never be improved.
+Found by trying to measure how long an evolution takes and discovering one that
+was arithmetically impossible. There is now a "Heavier Bolt" card.
+
+### Levels were far too slow for any of this — because two brakes hit one wheel
+
+Levelling was deliberately slowed twice, at your request, and that still stands.
+But a *second* change landed on top and nobody re-measured: loot stopped flying to
+the player and had to be walked over. Measured with both in place:
+
+| played | reached |
+|---|---|
+| 15 minutes of walking | **level 2** |
+| 10 minutes of walking and fighting | **level 3** |
+
+At that rate an evolution needing seven specific picks could not be reached by
+anybody, ever, and the cards stopped being a source of depth at all. The **curve
+is untouched** — what changed is what a body is worth (a swarmer 1→3, a brute
+5→9, a stalker 3→5), which also means walking over loot now pays for the walk.
+Re-measured, same ten minutes: **level 8, 458 kills, survived throughout**, with
+levels 1–4 in the first minute and then the slow climb you asked for.
+
+### The nest fights hardest at the end now — because the comment always said so
+
+`spawnMultiplierWhileCapturing` was applied flat from the first second of a
+capture, while the comment above it read "it fights hardest at the end". It does
+now. This was found while measuring the problem below.
+
+---
+
+## The open problem: a new player cannot clear their first nest
+
+This is the headline mechanic and the only way to earn money, and measured on a
+Da Nang street a brand-new player **cannot do it**:
+
+```
+fresh player   walks 97 m to a nest, arrives on 82% health,
+               reaches 8% progress, DEAD five seconds later
+upgraded       clears three nests in five minutes, never drops below 84%
+```
+
+A cliff between impossible and trivial with no game in between. Things checked
+and ruled out:
+
+- **Not caused by the crowd-pressure change.** With it switched off the same
+  player died *two seconds sooner*.
+- **Not fixed by knowing to retreat.** A simulated player who backs off at 45%
+  health still died — the fall from 88% to dead takes about thirty seconds at a
+  nest, faster than a person is likely to react.
+- **Not fixed by the difficulty ramp above**, which helps but is not enough.
+- **Standing at the edge of the capture ring** (24 m rather than 16 m) survives
+  longer but never starts capturing, because capture is measured from the
+  smoothed GPS anchor, which lags behind.
+
+A new player therefore has to fund their first upgrades from the coins monsters
+drop, and only then can nests be attempted. That is a workable progression but it
+is **not what the game tells them** — the tutorial hint says to walk to a nest and
+stand near it, which will get them killed. Left unfixed rather than guessed at,
+because the fix is a design decision: cheaper first nests, a weaker "young" nest,
+or a smaller hold time.
+
+---
+
 ## Known issues and honest limitations
 
 | | |
