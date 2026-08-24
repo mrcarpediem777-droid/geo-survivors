@@ -62,6 +62,18 @@ export interface ProfileData {
   soundOn: boolean;
   /** Vibration. Default off: it costs battery and not everybody wants it. */
   hapticsOn: boolean;
+  /**
+   * How many nests have been cleared in each patch of world, and which six-hour
+   * slot that count belongs to.
+   *
+   * This is what lets a neighbourhood actually be FINISHED. It is keyed by the
+   * geohash cell rather than by nest, because the nests themselves are
+   * calculated from the cell and the time slot -- there is nothing to store
+   * about an individual one. When the slot rolls over, the count is stale and
+   * the neighbourhood is fresh again, which is also what gives somebody a reason
+   * to come back this evening.
+   */
+  clearedByCell: Record<string, { slot: number; count: number }>;
   /** Every piece of equipment bought so far, by id. */
   ownedEquipment: string[];
   /** Which item is worn in each of the three slots. Empty means nothing. */
@@ -93,6 +105,7 @@ function freshProfile(): ProfileData {
     hintsSeen: [],
     soundOn: true,
     hapticsOn: false,
+    clearedByCell: {},
   };
 }
 

@@ -373,6 +373,20 @@ export const TUNING = {
      */
     countPerCell: 12,
     /**
+     * HOW MANY MUST BE DESTROYED TO EMPTY A NEIGHBOURHOOD.
+     *
+     * Deliberately a different number from `countPerCell`, which is how many
+     * exist at once. The map stays as busy as it always was; this is only the
+     * goal. Measured: clearing one takes roughly eight minutes including the
+     * walk to the next, so twelve would be an hour and a half -- too long to
+     * finish in one outing, and the count resets with the six-hour world slot,
+     * so a goal nobody reaches is no goal at all.
+     *
+     * Six is about forty-five minutes: one proper walk, which is exactly the
+     * session this game was designed around.
+     */
+    perNeighbourhood: 6,
+    /**
      * A nest is scenery until your real position is this close. Then it wakes,
      * starts ageing and starts spawning.
      *   SMALLER = the neighbourhood is quiet; you choose your fights.
@@ -539,6 +553,16 @@ export const TUNING = {
      * never wipe out a minute of work.
      */
     decayRate: 0.35,
+    /**
+     * Paid once for emptying a whole patch of world of nests.
+     *
+     * Finishing a neighbourhood is the only moment in this game that means
+     * "done" -- without something marking it, the twelfth nest would feel
+     * exactly like the eleventh and the achievement would pass unnoticed.
+     * Generous on purpose: it is the reward for a long walk, which is the
+     * behaviour this entire game exists to encourage.
+     */
+    neighbourhoodBonus: 140,
     /** Essence for clearing a nest, before the age bonus. */
     baseReward: 30,
     /** Extra essence for every minute the nest had been alive. */
