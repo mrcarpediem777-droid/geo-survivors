@@ -215,6 +215,25 @@ export class FlowField {
     const stampRadius = Math.max(1, Math.round(halfWidthMetres / CELL_METRES));
 
     for (const street of streets) {
+      /*
+       * A BRIDGE BEATS THE WATER UNDERNEATH IT.
+       *
+       * Everything below refuses to paint a road onto a blocked square, which is
+       * right for a building and catastrophic for a bridge: water is solid, so a
+       * river became an absolute barrier that neither the swarm nor the player
+       * could ever cross. Measured on the Han river -- twelve solid points out of
+       * twenty-five sampled across it, and not one carrying a road, in a city
+       * with six bridges.
+       *
+       * So a bridge unblocks what it crosses. Narrowly: `bridgeRadius` is
+       * deliberately tighter than an ordinary road stamp, because the whole
+       * character of a bridge is that it is the ONLY way across and everything
+       * has to funnel onto it.
+       */
+      const isBridge = street.bridge === true;
+      const radius = isBridge
+        ? Math.max(1, Math.round((halfWidthMetres * 0.8) / CELL_METRES))
+        : stampRadius;
       const points = street.coords;
       for (let i = 0; i + 3 < points.length; i += 2) {
         const ax = (points[i] - originLng) * metresPerLng;
@@ -234,13 +253,18 @@ export class FlowField {
           const cy = this.worldToCellY(py);
           if (cx < 0 || cy < 0 || cx >= SIZE || cy >= SIZE) continue;
 
-          for (let ox = -stampRadius; ox <= stampRadius; ox++) {
-            for (let oy = -stampRadius; oy <= stampRadius; oy++) {
+          for (let ox = -radius; ox <= radius; ox++) {
+            for (let oy = -radius; oy <= radius; oy++) {
               const nx = cx + ox;
               const ny = cy + oy;
               if (nx < 0 || ny < 0 || nx >= SIZE || ny >= SIZE) continue;
               const index = ny * SIZE + nx;
-              if (this.blocked[index]) continue;
+              // A bridge carves its own way through; anything else respects the
+              // walls it was given.
+              if (this.blocked[index]) {
+                if (!isBridge) continue;
+                this.blocked[index] = 0;
+              }
               if (!this.onStreet[index]) painted++;
               this.onStreet[index] = 1;
             }

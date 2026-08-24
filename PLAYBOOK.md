@@ -10,7 +10,7 @@ Claude: *"Read PLAYBOOK.md and tell me where we left off."*
 | | |
 |---|---|
 | **Milestone reached** | **M5 — clearing nests and permanent progress** ✅ |
-| **Next milestone** | M8 — a neighbourhood can be cleared, so a session has an ending |
+| **Next milestone** | M9 — the map's meaning: bridges exist; street kinds next |
 | **Code lives at** | https://github.com/mrcarpediem777-droid/geo-survivors |
 | **Live URL** | **https://geo-survivors.vercel.app** |
 | **Vercel dashboard** | https://vercel.com/abc-70f4/geo-survivors |
@@ -981,6 +981,47 @@ sixth nest **and every one after it** — and twelve nests are already standing 
 the map when the quota is met, so that was 140 essence apiece for six more of
 them. Somebody would have found that within a day. It is paid on the crossing
 now, not on being past it.
+
+---
+
+## Bridges exist now (M9), and a river is no longer the end of the world
+
+The map was already the design — real buildings are walls, the swarm walks real
+streets. What was missing was the map's **meaning**: the street layer was read
+and every property on it thrown away on one line, so a motorway, a flight of
+steps and a back alley were the same thing to the game.
+
+That was mostly a missed opportunity. One case was a genuine fault: **a bridge
+was the same thing as any other road**, and roads are never painted onto solid
+ground, and water is solid. So bridges did not exist. Measured on the Han river
+in Da Nang: of twenty-five points sampled across the water, **twelve were solid
+and not one carried a road** — in a city built around a river with six bridges,
+half the map was unreachable, by the swarm and by the player alike.
+
+Now a bridge beats the water underneath it, in both worlds: it carves a way
+through the navigation grid, and the collision world ignores water close to a
+bridge line. Measured standing on a real Da Nang bridge:
+
+```
+on the bridge        player can stand      swarm: open, road painted
+15 m to one side     player shoved off     swarm: blocked
+15 m to the other    player shoved off     swarm: blocked
+30 m to one side     player shoved off     swarm: blocked
+```
+
+The river is still a wall. The bridge is the only way across — which makes it
+exactly the chokepoint a bridge should be, without a line of level design being
+written by hand. Deliberately stamped **narrower** than an ordinary road for the
+same reason.
+
+### What the map is still not being asked
+
+`kind`, `tunnel` and the rest are now carried through and only `bridge` is used.
+One tile of Da Nang holds 8 primary roads, 14 service roads, 6 footways, 3
+flights of steps, 5 alleys and 3 pedestrian streets, and the game treats them
+identically — plus whole layers never opened at all (`street_polygons`,
+`bridges`, `pois`, `sites`). Steps that slow a swarm, alleys that funnel it,
+squares with no cover: all of that is now one table away rather than a rewrite.
 
 ---
 

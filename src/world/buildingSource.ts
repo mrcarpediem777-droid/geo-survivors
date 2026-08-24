@@ -113,6 +113,27 @@ function tileUrl(x: number, y: number, zoom: number, useMirror: boolean): string
 /** One stretch of road, as a run of longitude/latitude points. */
 export interface StreetLine {
   coords: Float64Array;
+
+  /*
+   * WHAT KIND OF STREET THIS IS.
+   *
+   * Every one of these was being read out of the map and thrown away on the
+   * line that built this object. A motorway, a flight of steps and a back alley
+   * were the same thing to the game -- and, more seriously, a BRIDGE was the
+   * same thing as any other road, which meant it did not exist at all: water is
+   * solid, roads are never painted over solid ground, so a river was an
+   * absolute barrier with no way across.
+   *
+   * Measured on the Han river in Da Nang: of twenty-five points sampled across
+   * the water, twelve were solid and NOT ONE of them carried a road. In a city
+   * built around a river with six bridges, half the map was unreachable.
+   */
+  /** "primary", "footway", "steps", "service"... straight from the map. */
+  kind: string;
+  /** Carried over water or a road. The reason this whole field exists. */
+  bridge: boolean;
+  /** Under something. Narrow, and the sky is not the point here. */
+  tunnel: boolean;
 }
 
 export class BuildingSource {
@@ -239,6 +260,12 @@ export class BuildingSource {
               ? geometry.coordinates
               : [];
 
+        const properties = feature.properties ?? {};
+        const kind = String(properties.kind ?? 'unknown');
+        // Data uses real booleans here, but be forgiving: a provider that sends
+        // the string "true" should not silently delete every bridge in the city.
+        const truthy = (value: unknown) => value === true || value === 'true';
+
         for (const line of lines) {
           if (!line || line.length < 2) continue;
           const coords = new Float64Array(line.length * 2);
@@ -247,7 +274,12 @@ export class BuildingSource {
             coords[k * 2] = point[0];
             coords[k * 2 + 1] = point[1];
           }
-          streets.push({ coords });
+          streets.push({
+            coords,
+            kind,
+            bridge: truthy(properties.bridge),
+            tunnel: truthy(properties.tunnel),
+          });
         }
       }
     }

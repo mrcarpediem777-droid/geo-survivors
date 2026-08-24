@@ -748,6 +748,24 @@ export class Game {
         around.lat,
         TUNING.walls.loadRadiusMetres
       );
+      // Hand the bridges to the collision world before anything walks on them,
+      // so the player is not shoved off into the river.
+      const bridgeSegments: number[] = [];
+      const metresPerLng = 111320 * Math.cos((around.lat * Math.PI) / 180);
+      for (const street of streets) {
+        if (!street.bridge) continue;
+        const points = street.coords;
+        for (let i = 0; i + 3 < points.length; i += 2) {
+          bridgeSegments.push(
+            (points[i] - around.lng) * metresPerLng,
+            (points[i + 1] - around.lat) * 111320,
+            (points[i + 2] - around.lng) * metresPerLng,
+            (points[i + 3] - around.lat) * 111320
+          );
+        }
+      }
+      this.collision.setBridges(bridgeSegments, TUNING.navigation.bridgeHalfWidthMetres);
+
       this.flowField.rasteriseStreets(
         streets,
         around.lng,
