@@ -500,6 +500,28 @@ export const TUNING = {
      */
     holdSeconds: 50,
     /**
+     * A NEST THAT HAS ONLY JUST OPENED IS EASIER PREY.
+     *
+     * Half of this idea was already in the game: an old nest spawns faster, and
+     * pays far more essence for the same work. The other half was missing, and
+     * its absence made the first nest of a new player's life unwinnable --
+     * measured, they walked 97 m, arrived on 82% health, reached 8% progress and
+     * died five seconds later.
+     *
+     * Now age decides how hard a nest is to destroy as well as how much it is
+     * worth, so the two halves finally say the same thing: a fresh hole in the
+     * pavement is quick and cheap, and one that has been festering for ten
+     * minutes is a siege that pays for itself. That is a decision on the map
+     * rather than a difficulty setting in a menu, and a new player can start.
+     *
+     * Maturity is measured on the same clock as the spawn escalation --
+     * `nests.escalationOverSeconds` -- so there is one idea here, not two.
+     */
+    /** Share of the hold time a brand-new nest needs. 1 would remove the effect. */
+    youngHoldFraction: 0.45,
+    /** Share of the full "fights back" multiplier a brand-new nest musters. */
+    youngResistanceFraction: 0.3,
+    /**
      * How much faster the nest spawns while you are clearing it, AT THE VERY
      * END. It starts at the ordinary rate and works up to this as the nest dies.
      *
