@@ -262,7 +262,23 @@ export const TUNING = {
         health: 26,
         damagePerSecond: 6,
         radiusMetres: 1.6,
-        xp: 1,
+        /*
+         * WORTH MORE THAN IT WAS. Not because levels should come faster in
+         * principle -- they were deliberately slowed twice, and that stands --
+         * but because a SECOND change landed on top without anyone re-measuring:
+         * loot stopped flying to the player and has to be walked over. Two
+         * brakes were applied to the same wheel.
+         *
+         * Measured after both: ten minutes of walking and fighting produced
+         * LEVEL 3. Fifteen minutes of walking produced level 2. At that rate the
+         * weapon evolutions -- which need a weapon at level four and a passive
+         * taken three times -- could not be reached by anybody, ever, and the
+         * cards themselves stopped being a source of depth at all.
+         *
+         * The curve is untouched. Only what a body is worth has changed, which
+         * also means walking over the loot pays properly for the walk.
+         */
+        xp: 3,
         colour: [220, 70, 70, 255],
         weight: 70,
       },
@@ -273,7 +289,7 @@ export const TUNING = {
         health: 120,
         damagePerSecond: 13,
         radiusMetres: 2.8,
-        xp: 5,
+        xp: 9,
         colour: [180, 60, 110, 255],
         weight: 20,
       },
@@ -288,7 +304,7 @@ export const TUNING = {
         health: 18,
         damagePerSecond: 0,
         radiusMetres: 1.8,
-        xp: 3,
+        xp: 5,
         colour: [230, 140, 50, 255],
         /**
          * SET TO 0 ON REQUEST: nothing shoots at the player any more.
@@ -316,7 +332,7 @@ export const TUNING = {
         health: 50,
         damagePerSecond: 9,
         radiusMetres: 2.0,
-        xp: 3,
+        xp: 5,
         colour: [230, 140, 50, 255],
         weight: 10,
       },
@@ -484,8 +500,15 @@ export const TUNING = {
      */
     holdSeconds: 50,
     /**
-     * How much faster the nest spawns while you are clearing it. This is the
-     * "under heavy attack" part -- it fights hardest at the end.
+     * How much faster the nest spawns while you are clearing it, AT THE VERY
+     * END. It starts at the ordinary rate and works up to this as the nest dies.
+     *
+     * It used to be applied flat from the first second, which quietly made a
+     * first nest impossible: measured, a fresh player walked 97 m, arrived on
+     * 82% health, reached 8% progress and died five seconds later with nothing
+     * to show for a minute of real walking. A moderately upgraded player, by
+     * contrast, cleared three in a row and never dropped below 84% -- a cliff
+     * between impossible and trivial, with no game in between.
      */
     spawnMultiplierWhileCapturing: 3.4,
     /**
