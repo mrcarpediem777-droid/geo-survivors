@@ -228,6 +228,48 @@ export class CollisionWorld {
    * Run a few times so that a character wedged into a corner gets pushed out of
    * both walls rather than bouncing between them.
    */
+  /**
+   * Bridge centre-lines, as flat pairs of metre coordinates.
+   *
+   * Water is solid, which is right -- nobody swims here. But it made every river
+   * an absolute barrier, because nothing carved a way across: measured on the
+   * Han river, twelve of twenty-five points sampled across it were solid and not
+   * one carried a road, in a city with six bridges. Standing ON a bridge was
+   * impossible, so half of Da Nang was unreachable.
+   *
+   * Water is therefore ignored close to a bridge. Only water: a bridge over a
+   * road does not let you walk through the buildings beside it.
+   */
+  private bridgeSegments: number[] = [];
+  /** How far from a bridge's centre-line still counts as being on it. */
+  private bridgeHalfWidth = 5;
+
+  setBridges(segments: number[], halfWidthMetres: number): void {
+    this.bridgeSegments = segments;
+    this.bridgeHalfWidth = halfWidthMetres;
+  }
+
+  /** Is this spot standing on a bridge, and therefore above the water? */
+  private onBridge(x: number, y: number): boolean {
+    const limit = this.bridgeHalfWidth * this.bridgeHalfWidth;
+    const s = this.bridgeSegments;
+    for (let i = 0; i + 3 < s.length; i += 4) {
+      const ax = s[i];
+      const ay = s[i + 1];
+      const bx = s[i + 2];
+      const by = s[i + 3];
+      const dx = bx - ax;
+      const dy = by - ay;
+      const lengthSquared = dx * dx + dy * dy;
+      let t = lengthSquared > 0 ? ((x - ax) * dx + (y - ay) * dy) / lengthSquared : 0;
+      t = t < 0 ? 0 : t > 1 ? 1 : t;
+      const px = x - (ax + dx * t);
+      const py = y - (ay + dy * t);
+      if (px * px + py * py <= limit) return true;
+    }
+    return false;
+  }
+
   resolveCircle(
     x: number,
     y: number,
@@ -259,6 +301,11 @@ export class CollisionWorld {
           out.y + radius < wall.minY ||
           out.y - radius > wall.maxY
         ) {
+          continue;
+        }
+
+        // Standing on a bridge means standing above the water, not in it.
+        if (wall.isWater && this.bridgeSegments.length > 0 && this.onBridge(out.x, out.y)) {
           continue;
         }
 

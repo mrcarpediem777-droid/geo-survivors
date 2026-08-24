@@ -799,6 +799,15 @@ export const TUNING = {
      * everywhere was a street. Narrow roads make the preference bite.
      */
     streetHalfWidthMetres: 2.5,
+    /**
+     * How wide a bridge is, for standing on.
+     *
+     * Wider than an ordinary street stamp because being nudged off a bridge into
+     * a river by GPS drift would be maddening, and because the deck of a real
+     * road bridge genuinely is wide. Narrow enough that the bridge is still
+     * plainly a bottleneck -- which is the whole reason it is interesting.
+     */
+    bridgeHalfWidthMetres: 7,
   },
 
   /* ---------------------------------------------------------------------- */
