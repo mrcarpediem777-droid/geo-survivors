@@ -995,6 +995,10 @@ export class Game {
         screenY: Math.max(margin, Math.min(height - margin, point.y)),
         distanceMetres: distance,
         onScreen,
+        // How grown-up it is, so the marker can say whether this one is a quick
+        // errand or a siege. Without showing it, choosing between nests by age
+        // would be a decision the player has no way of making.
+        maturity: this.combat.maturityOf(nest),
       };
     });
 

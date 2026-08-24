@@ -10,7 +10,7 @@ Claude: *"Read PLAYBOOK.md and tell me where we left off."*
 | | |
 |---|---|
 | **Milestone reached** | **M5 — clearing nests and permanent progress** ✅ |
-| **Next milestone** | M7 — sound and vibration, so the game can be played without looking at it |
+| **Next milestone** | M7 — evolutions, sound and vibration; the loop works end to end for a new player |
 | **Code lives at** | https://github.com/mrcarpediem777-droid/geo-survivors |
 | **Live URL** | **https://geo-survivors.vercel.app** |
 | **Vercel dashboard** | https://vercel.com/abc-70f4/geo-survivors |
@@ -926,36 +926,44 @@ now. This was found while measuring the problem below.
 
 ---
 
-## The open problem: a new player cannot clear their first nest
+## A nest's age now decides how hard it is, not just what it pays
 
-This is the headline mechanic and the only way to earn money, and measured on a
-Da Nang street a brand-new player **cannot do it**:
+A new player could not clear their first nest — the headline mechanic and the
+only way to earn money. Measured on a Da Nang street: walked 97 m, arrived on
+82% health, reached 8% progress, **dead five seconds later**. An upgraded player
+cleared three in five minutes and never dropped below 84%. A cliff between
+impossible and trivial with no game in between.
 
-```
-fresh player   walks 97 m to a nest, arrives on 82% health,
-               reaches 8% progress, DEAD five seconds later
-upgraded       clears three nests in five minutes, never drops below 84%
-```
+**Half the fix was already in the game.** An old nest already spawned faster and
+already paid far more essence for the same work. What was missing was the other
+half: age had no say in how hard a nest was to *destroy*. Now it does, on the
+same clock, so the two halves finally say the same thing.
 
-A cliff between impossible and trivial with no game in between. Things checked
-and ruled out:
+| nest alive | hold time | fights back | pays |
+|---|---|---|---|
+| 0 s (just opened) | 23 s | ×1.72 | 30 |
+| 60 s | 34 s | ×2.39 | 38 |
+| 150 s or more | 50 s | ×3.40 | 50 |
+| 5 minutes | 50 s | ×3.40 | 70 |
 
-- **Not caused by the crowd-pressure change.** With it switched off the same
-  player died *two seconds sooner*.
-- **Not fixed by knowing to retreat.** A simulated player who backs off at 45%
-  health still died — the fall from 88% to dead takes about thirty seconds at a
-  nest, faster than a person is likely to react.
-- **Not fixed by the difficulty ramp above**, which helps but is not enough.
-- **Standing at the edge of the capture ring** (24 m rather than 16 m) survives
-  longer but never starts capturing, because capture is measured from the
-  smoothed GPS anchor, which lags behind.
+A fresh hole in the pavement is a quick errand worth little. One that has been
+festering since you left the house is a siege that pays for itself. **That is a
+decision on the map, not a difficulty setting in a menu** — which is why this
+route was chosen over cheaper first nests or a shorter hold time.
 
-A new player therefore has to fund their first upgrades from the coins monsters
-drop, and only then can nests be attempted. That is a workable progression but it
-is **not what the game tells them** — the tutorial hint says to walk to a nest and
-stand near it, which will get them killed. Left unfixed rather than guessed at,
-because the fix is a design decision: cheaper first nests, a weaker "young" nest,
-or a smaller hold time.
+Measured after, same brand-new player, twice: **first nest cleared at 70 s and
+71 s**, reaching level 8, one retreat each time; the second run survived the full
+five minutes. Before the change: dead at 58–91 s with nothing cleared.
+
+**The markers say which is which.** Green NEW, yellow GROWING, red OLD, next to
+the distance. Without that the choice would exist and be unmakeable. The tutorial
+hint says the same in words, and now tells the truth: take a new one first.
+
+Nests only age while they are **awake**, so distant ones stay fresh until you
+come near. Walking into a neighbourhood you have not visited finds young nests;
+lingering in one makes them worth more and harder to take.
+
+---
 
 ---
 

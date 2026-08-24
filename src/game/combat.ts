@@ -492,7 +492,7 @@ export class Combat {
 
       if (nest.beingCaptured) {
         nest.captureProgress +=
-          (deltaSeconds / TUNING.capture.holdSeconds) * this.captureSpeedMultiplier;
+          (deltaSeconds / this.holdSecondsFor(nest)) * this.captureSpeedMultiplier;
 
         if (nest.captureProgress >= 1) {
           this.destroyNest(i);
@@ -503,7 +503,7 @@ export class Combat {
         // must never cost a minute of standing there.
         nest.captureProgress = Math.max(
           0,
-          nest.captureProgress - (deltaSeconds / TUNING.capture.holdSeconds) * TUNING.capture.decayRate
+          nest.captureProgress - (deltaSeconds / this.holdSecondsFor(nest)) * TUNING.capture.decayRate
         );
       }
 
@@ -527,8 +527,25 @@ export class Combat {
    * nest is left alone, the closer its interval creeps to the floor. It is what
    * makes standing still forever unsurvivable, exactly as the brief demands.
    */
+  /**
+   * How grown-up a nest is, 0 to 1.
+   *
+   * The single measure of a nest's age, used for how fast it spawns, how long
+   * it takes to destroy, how hard it fights while you do, and what it pays. One
+   * idea rather than four, so a nest that LOOKS old behaves old in every way.
+   */
+  maturityOf(nest: Nest): number {
+    return Math.min(1, nest.ageSeconds / TUNING.nests.escalationOverSeconds);
+  }
+
+  /** Seconds of holding position this particular nest needs. */
+  private holdSecondsFor(nest: Nest): number {
+    const young = TUNING.capture.youngHoldFraction;
+    return TUNING.capture.holdSeconds * (young + (1 - young) * this.maturityOf(nest));
+  }
+
   private spawnIntervalFor(nest: Nest): number {
-    const progress = Math.min(1, nest.ageSeconds / TUNING.nests.escalationOverSeconds);
+    const progress = this.maturityOf(nest);
     // Ease in, so a fresh nest is gentle and a mature one is relentless.
     const eased = progress * progress;
     const interval =
@@ -550,7 +567,14 @@ export class Combat {
     // survivable, the last stretch is the hard part, and stepping back to breathe
     // costs only the gentle decay rather than your life.
     if (!nest.beingCaptured) return interval;
-    const ramp = 1 + (TUNING.capture.spawnMultiplierWhileCapturing - 1) * nest.captureProgress;
+
+    // Two things hold it back: how far through its destruction we are, and how
+    // old it is. A hole that opened a minute ago barely struggles; one that has
+    // been festering since you left the house fights like the brief describes.
+    const young = TUNING.capture.youngResistanceFraction;
+    const grown = young + (1 - young) * this.maturityOf(nest);
+    const ramp =
+      1 + (TUNING.capture.spawnMultiplierWhileCapturing - 1) * nest.captureProgress * grown;
     return interval / ramp;
   }
 

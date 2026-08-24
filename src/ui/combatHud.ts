@@ -404,7 +404,13 @@ export class CombatHud {
    * empty street into a decision about which way to face.
    */
   updateNestMarkers(
-    markers: { screenX: number; screenY: number; distanceMetres: number; onScreen: boolean }[]
+    markers: {
+      screenX: number;
+      screenY: number;
+      distanceMetres: number;
+      onScreen: boolean;
+      maturity: number;
+    }[]
   ): void {
     // Grow the pool of arrows if a new area has more nests.
     while (this.nestMarkers.length < markers.length) {
@@ -434,10 +440,19 @@ export class CombatHud {
       marker.style.left = `${data.screenX}px`;
       marker.style.top = `${data.screenY}px`;
       marker.style.opacity = data.onScreen ? '0.75' : '1';
+
+      // AGE IS THE CHOICE. A young nest falls in about twenty seconds and pays
+      // little; an old one is a siege worth more than twice as much. Saying so
+      // on the marker is what turns "which way shall I walk" into a decision
+      // instead of a coin toss -- colour for a glance, a word for certainty.
+      const old = data.maturity > 0.66;
+      const middling = data.maturity > 0.33;
+      marker.style.color = old ? '#f87171' : middling ? '#facc15' : '#4ade80';
+      const age = old ? 'OLD' : middling ? 'GROWING' : 'NEW';
       marker.textContent = data.onScreen
-        ? `NEST
+        ? `${age}
 ${data.distanceMetres.toFixed(0)} m`
-        : `◆
+        : `◆ ${age}
 ${data.distanceMetres.toFixed(0)} m`;
       marker.style.whiteSpace = 'pre';
     }

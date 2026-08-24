@@ -65,7 +65,7 @@ const HINTS: Hint[] = [
      */
     id: 'nest',
     when: (w) => w.nearestNestMetres !== null && w.nearestNestMetres < 200,
-    text: 'Those dark holes are <b>nests</b>, and they are where the coins come from. Walk to one and stand near it to destroy it.',
+    text: 'Those dark holes are <b>nests</b> — where the coins come from. Walk to one and stand near it. Take a <b style="color:#4ade80">NEW</b> one first: they fall quickly. <b style="color:#f87171">OLD</b> ones pay far more and fight back hard.',
   },
   {
     id: 'hurt',

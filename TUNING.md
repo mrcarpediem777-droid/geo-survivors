@@ -416,6 +416,30 @@ Padded Jacket and a Field Kit are actually for.
 
 ---
 
+## A nest's age decides everything about it
+
+One clock — `nests.escalationOverSeconds` — decides how fast a nest spawns, how
+long it takes to destroy (`capture.youngHoldFraction`), how hard it fights while
+you do (`capture.youngResistanceFraction`), and what it pays
+(`capture.rewardPerMinuteAlive`). One idea, four effects, so a nest that *looks*
+old behaves old in every way.
+
+| nest alive | hold | fights back | pays |
+|---|---|---|---|
+| 0 s | 23 s | ×1.72 | 30 |
+| 60 s | 34 s | ×2.39 | 38 |
+| 150 s+ | 50 s | ×3.40 | 50 |
+
+Only the last of those four used to exist. Without the others a new player could
+not clear their first nest at all — measured, they walked 97 m, arrived on 82%
+health, reached 8% progress and died five seconds later. Afterwards, the same
+player clears one at 70 seconds.
+
+Nests age only while **awake** (`nests.activateWithinMetres`), so a neighbourhood
+you have not visited is full of young ones.
+
+---
+
 ## Streets, and how many nests
 
 | Number | Now | What it does |
