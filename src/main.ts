@@ -13,6 +13,7 @@
  */
 
 import { TUNING } from './config/tuning';
+import { registerOfflineSupport, offerInstall } from './app/install';
 import { Profile } from './profile/profile';
 import { PlayerLocation } from './location/playerLocation';
 import { MapView } from './map/mapView';
@@ -46,8 +47,14 @@ const FALLBACK_START: LatLng = { lat: 15.8801, lng: 108.338 }; // Hoi An, Vietna
 async function boot(): Promise<void> {
   const uiContainer = document.getElementById('ui')!;
 
+  // 0. BEING AN APP RATHER THAN A PAGE -------------------------------------
+  // Registered before anything else so that a player who loses signal halfway
+  // through the very first load still ends up with the safety net installed.
+  registerOfflineSupport();
+
   // 1. WHAT THE PLAYER OWNS ------------------------------------------------
   const profile = new Profile();
+  offerInstall(uiContainer, () => profile.update({ installedToHomeScreen: true }));
 
   // 2. THE MAP -------------------------------------------------------------
   const startAt = profile.get().lastKnownPosition ?? FALLBACK_START;

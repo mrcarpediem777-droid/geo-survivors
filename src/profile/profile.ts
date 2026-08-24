@@ -54,6 +54,8 @@ export interface ProfileData {
   unlockedCharacters: string[];
   /** Which one is being played. */
   selectedCharacter: string;
+  /** True once the game has been added to the phone's home screen. */
+  installedToHomeScreen: boolean;
   /** Every piece of equipment bought so far, by id. */
   ownedEquipment: string[];
   /** Which item is worn in each of the three slots. Empty means nothing. */
@@ -81,6 +83,7 @@ function freshProfile(): ProfileData {
     selectedCharacter: 'wanderer',
     ownedEquipment: [],
     equippedBySlot: {},
+    installedToHomeScreen: false,
   };
 }
 

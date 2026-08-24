@@ -10,7 +10,7 @@ Claude: *"Read PLAYBOOK.md and tell me where we left off."*
 | | |
 |---|---|
 | **Milestone reached** | **M5 — clearing nests and permanent progress** ✅ |
-| **Next milestone** | M6 — polish: installable app, tutorial, low power mode, analytics |
+| **Next milestone** | M6 — polish: ~~installable app~~ ✅, tutorial, low power mode, analytics |
 | **Code lives at** | https://github.com/mrcarpediem777-droid/geo-survivors |
 | **Live URL** | **https://geo-survivors.vercel.app** |
 | **Vercel dashboard** | https://vercel.com/abc-70f4/geo-survivors |
@@ -646,6 +646,47 @@ Standing still, +60 health is now worth three seconds rather than one. That is s
 deliberately small: standing still is not a strategy this game supports. The armour slot
 is what lets you disengage and come back — the 240-second survival above is what a Padded
 Jacket and a Field Kit are actually for.
+
+---
+
+## Installing it on a phone (M6)
+
+The game can now be **put on the home screen** and opens like an app — its own
+icon, no browser bar, no address to type. On Android the game offers this itself
+after a minute and a half of play; on iPhone, Safari has no such offer, so it has
+to be done by hand: **Share → Add to Home Screen**.
+
+The offer waits deliberately. A prompt that appears the second a stranger opens
+something asks for a commitment before they know what the thing is, gets refused,
+and the browser remembers the refusal — so the one chance is spent on the worst
+possible moment.
+
+### It genuinely works with no signal
+
+Tested by switching the server off completely and reloading: the page, the map
+canvas and the game all came up. That matters on a walk — a lift, the back of a
+building, a street with no bars — where the alternative is the game turning into
+a browser error page mid-run.
+
+**The rule the offline helper follows: never trap somebody on an old version.**
+The usual way this goes wrong is serving the cached copy first, forever, so a
+player keeps playing a build from three weeks ago and every fix we deploy is
+invisible to them. Nothing is served from the cache while the network is
+answering; the cache is a safety net, not a shortcut. `vercel.json` also tells
+the phone never to cache the helper itself, because an old copy of *that* file
+would pin somebody to an old game permanently.
+
+**Map tiles are deliberately not cached.** They are large and there are thousands
+of them; filling somebody's phone with a city's worth of map is not ours to do
+quietly. The browser keeps its own copies anyway.
+
+### The icons are drawn by a script
+
+`node tools/make-icons.mjs` redraws all six sizes — a blue dot standing at a
+street junction, which is what the game looks like. Change the numbers at the top
+of that file and run it again. It writes the PNG bytes itself with nothing but
+what Node already has, so there is no image editor to own and no picture in the
+repository that nobody can edit.
 
 ---
 
