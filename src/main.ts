@@ -18,6 +18,7 @@ import { Tutorial } from './ui/tutorial';
 import { watchBattery, offerLowPower } from './app/battery';
 import * as rewardedAd from './app/rewardedAd';
 import { Journal } from './app/journal';
+import { Sound, Haptics } from './app/sound';
 import { Profile } from './profile/profile';
 import { PlayerLocation } from './location/playerLocation';
 import { MapView } from './map/mapView';
@@ -153,6 +154,13 @@ async function boot(): Promise<void> {
   // it, and it never leaves the phone.
   const journal = new Journal();
   game.journal = journal;
+
+  // 6e. SOUND AND VIBRATION ------------------------------------------------
+  // Not decoration. This game is played while walking down a real street, and
+  // until now the only way to know anything was to look at the screen -- which
+  // quietly turns "go for a walk" into "stare at a phone near traffic". See the
+  // note at the top of sound.ts.
+  game.useSound(new Sound(profile.get().soundOn), new Haptics(profile.get().hapticsOn));
   journal.record('opened', { installed: profile.get().installedToHomeScreen });
 
   // 6c. THE BATTERY --------------------------------------------------------
