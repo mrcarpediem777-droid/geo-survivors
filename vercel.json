@@ -8,5 +8,22 @@
       "source": "/maptiles-backup/:path*",
       "destination": "https://tiles.versatiles.org/:path*"
     }
+  ],
+  "headers": [
+    {
+      "//": "The offline helper must never be cached. If a phone holds on to an old copy of THIS file, it holds on to an old copy of the game forever and nothing we deploy can reach that player. It is 3 kB; asking for it fresh every time costs nothing.",
+      "source": "/service-worker.js",
+      "headers": [{ "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }]
+    },
+    {
+      "//": "Same reasoning, smaller stakes: the page itself names the current bundle.",
+      "source": "/index.html",
+      "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
+    },
+    {
+      "//": "Icons and the manifest change only when we redraw them, and their names do not change -- so a day is long enough to be useful and short enough to fix a mistake.",
+      "source": "/icons/(.*)",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=86400" }]
+    }
   ]
 }
