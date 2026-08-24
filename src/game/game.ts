@@ -157,6 +157,24 @@ export class Game {
   /** The log, if there is one. */
   journal: Journal | null = null;
 
+  /**
+   * The patch of world we are standing in, and how much of it is left.
+   *
+   * A neighbourhood holds a fixed number of nests for each six-hour slot. Clear
+   * them all and it goes quiet -- which is the only moment in this game that
+   * means "done", and the only thing that ever asks somebody to walk somewhere
+   * genuinely new rather than in circles.
+   */
+  private currentCell = '';
+  private currentSlot = -1;
+
+  /** How many nests are left to clear where we are standing. */
+  nestsLeftHere(): number {
+    const record = this.profile?.get().clearedByCell[this.currentCell];
+    const cleared = record && record.slot === this.currentSlot ? record.count : 0;
+    return Math.max(0, TUNING.nests.perNeighbourhood - cleared);
+  }
+
   /** The noise, and the buzz. See `sound.ts` for why these are not decoration. */
   private sound: Sound | null = null;
   private haptics: Haptics | null = null;
@@ -190,6 +208,9 @@ export class Game {
       onDeath: () => this.handleDeath(),
       onNestCleared: (reward) => this.handleNestCleared(reward),
     });
+
+    // Only refill the neighbourhood while it has nests left to give.
+    this.combat.mayReplaceNest = () => this.nestsLeftHere() > 1;
   }
 
   /* ------------------------------------------------------------------ */
@@ -224,11 +245,47 @@ export class Game {
   private handleNestCleared(reward: number): void {
     if (!this.profile) return;
     const data = this.profile.get();
+
+    // Count it against this patch of world, for this six-hour slot. A count from
+    // an older slot is stale: the neighbourhood has refreshed since.
+    const previous = data.clearedByCell[this.currentCell];
+    const cleared =
+      (previous && previous.slot === this.currentSlot ? previous.count : 0) + 1;
+    const clearedByCell = {
+      ...data.clearedByCell,
+      [this.currentCell]: { slot: this.currentSlot, count: cleared },
+    };
+
+    const left = Math.max(0, TUNING.nests.perNeighbourhood - cleared);
+
+    // Finishing a neighbourhood is the one moment in this game that means
+    // "done". It is worth something on its own, or the last nest would feel like
+    // any other nest and the achievement would pass unnoticed.
+    //
+    // PAID ON THE CROSSING, NOT ON BEING PAST IT. Written as "left === 0" first,
+    // which paid the bonus for the sixth nest AND every one after it -- and
+    // twelve nests are already standing on the map when the quota is met, so
+    // that was 140 essence apiece for six more of them. Somebody would have
+    // found that within a day.
+    const justFinished = cleared === TUNING.nests.perNeighbourhood;
+    const bonus = justFinished ? TUNING.capture.neighbourhoodBonus : 0;
+
     this.profile.update({
-      essence: data.essence + reward,
+      essence: data.essence + reward + bonus,
       nestsCleared: data.nestsCleared + 1,
+      clearedByCell,
     });
-    this.hud.showNestCleared(reward, data.essence + reward);
+
+    if (justFinished) {
+      // And the street actually empties. The message says every nest around here
+      // is gone, so leaving a dozen of them standing on the map would make it a
+      // lie -- and the quiet IS the reward, far more than the essence is.
+      this.combat.clearNests();
+      this.hud.showNeighbourhoodClear(bonus);
+      this.journal?.record('neighbourhood-cleared', { bonus });
+    } else {
+      this.hud.showNestCleared(reward, data.essence + reward, left);
+    }
     this.journal?.record('nest-cleared', {
       reward,
       metresWalked: Math.round(this.metresWalkedThisRun),
@@ -540,6 +597,8 @@ export class Game {
     const around = this.anchor ?? this.wallsBuiltAt;
     if (around) {
       const cell = worldCellFor(around.lat, around.lng);
+      this.currentCell = cell.cell;
+      this.currentSlot = cell.timeSlot;
       this.combat.placeNests(cell.seed);
     }
   }
@@ -702,6 +761,8 @@ export class Game {
 
       // Nests belong to the patch of world, so they move with it.
       const cell = worldCellFor(around.lat, around.lng);
+      this.currentCell = cell.cell;
+      this.currentSlot = cell.timeSlot;
       this.combat.placeNests(cell.seed);
 
       this.wallsBuiltAt = { ...around };
@@ -956,6 +1017,10 @@ export class Game {
       c.xpForNextLevel,
       `${minutes}:${String(seconds).padStart(2, '0')} LV${c.level} ${walls} ` +
         `nest ${Number.isFinite(nestDistance) ? Math.round(nestDistance) + 'm' : '--'} ` +
+        // How much of this neighbourhood is left. Always on screen, because it
+        // is the only long-term goal the game has and it should be aimable at
+        // rather than discovered by accident at the end.
+        `${this.nestsLeftHere()}/${TUNING.nests.perNeighbourhood} left ` +
         `m${c.aliveMonsters()} ${essence}✦`
     );
 

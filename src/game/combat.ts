@@ -263,7 +263,11 @@ export class Combat {
     }
   }
 
-  private clearNests(): void {
+  /**
+   * Take every nest off the map. Used when a run restarts, and when a
+   * neighbourhood is emptied -- the quiet afterwards is the actual reward.
+   */
+  clearNests(): void {
     for (const nest of this.nests) this.entities.release(nest.entityId);
     this.nests = [];
   }
@@ -452,6 +456,12 @@ export class Combat {
    */
   private monsterCap: number | null = null;
 
+  /**
+   * Asked before a cleared nest is replaced. Set by the game, which is the only
+   * thing that knows which patch of world this is and how much of it is left.
+   */
+  mayReplaceNest: (() => boolean) | null = null;
+
   setMonsterCap(cap: number | null): void {
     this.monsterCap = cap;
   }
@@ -588,8 +598,23 @@ export class Combat {
     this.entities.release(nest.entityId);
     this.nests.splice(index, 1);
 
-    // The world does not stay quiet. A replacement rises somewhere else, which
-    // is what keeps the loop turning.
+    // WHETHER A REPLACEMENT RISES IS NOT THIS FILE'S DECISION ANY MORE.
+    //
+    // It used to conjure one unconditionally, which meant a neighbourhood could
+    // never be finished: you cleared a nest, another appeared, and there was no
+    // moment of "done" anywhere in the game. A session had no shape -- fight,
+    // die, retry on the same street, forever.
+    //
+    // The patch of world you are standing in now holds a fixed number of nests
+    // for this six-hour slot. The game asks us for a replacement only while that
+    // quota has some left, and when it runs out the neighbourhood goes quiet and
+    // the next one is a walk away.
+    if (!this.mayReplaceNest || !this.mayReplaceNest()) {
+      this.sound?.play('nestCleared');
+      this.haptics?.buzz([40, 50, 40, 50, 120], 0);
+      this.events.onNestCleared(reward);
+      return;
+    }
     const spot = this.findOpenSpot(
       seededRandom(nest.seed + Math.round(this.runTimeSeconds)),
       TUNING.nests.minDistanceMetres,

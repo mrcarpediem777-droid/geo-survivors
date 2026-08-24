@@ -10,7 +10,7 @@ Claude: *"Read PLAYBOOK.md and tell me where we left off."*
 | | |
 |---|---|
 | **Milestone reached** | **M5 — clearing nests and permanent progress** ✅ |
-| **Next milestone** | M7 — evolutions, sound and vibration; the loop works end to end for a new player |
+| **Next milestone** | M8 — a neighbourhood can be cleared, so a session has an ending |
 | **Code lives at** | https://github.com/mrcarpediem777-droid/geo-survivors |
 | **Live URL** | **https://geo-survivors.vercel.app** |
 | **Vercel dashboard** | https://vercel.com/abc-70f4/geo-survivors |
@@ -947,6 +947,40 @@ come near. Walking into a neighbourhood you have not visited finds young nests;
 lingering in one makes them worth more and harder to take.
 
 ---
+
+---
+
+## A session can now be finished
+
+Until now the game had no ending anywhere in it. You fought, you died, you tapped
+retry, and you were on the same street doing the same thing. Clearing a nest
+instantly grew a replacement, so a neighbourhood could never run out and nothing
+ever meant **done**.
+
+Now the patch of world you are standing in holds a fixed quota of nests for each
+six-hour slot. Clear them and it goes quiet: a bonus, a message, and **the
+remaining nests actually vanish from the map** — the street empties, which is far
+more of a reward than the essence is. The count is always on screen (`4/6 left`)
+so it is something to aim at rather than something discovered by accident.
+
+**Six, not twelve.** The quota is a separate number from how many nests exist at
+once, so the map stays exactly as busy as it was. Measured, clearing one takes
+roughly eight minutes including the walk to the next, so twelve would be an hour
+and a half — too long for one outing, and the count resets with the world slot, so
+a goal nobody reaches is no goal at all. Six is about forty-five minutes: one
+proper walk, which is the session this game was designed around.
+
+It refills at the next six-hour slot, which is also the first thing in this game
+that gives somebody a reason to come back **this evening** rather than right now.
+Nothing is timed and nothing is lost by waiting.
+
+### The bonus was payable six times over
+
+Written first as "pay the bonus whenever nothing is left", which paid it for the
+sixth nest **and every one after it** — and twelve nests are already standing on
+the map when the quota is met, so that was 140 essence apiece for six more of
+them. Somebody would have found that within a day. It is paid on the crossing
+now, not on being past it.
 
 ---
 

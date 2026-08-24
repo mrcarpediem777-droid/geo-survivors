@@ -482,15 +482,38 @@ ${data.distanceMetres.toFixed(0)} m`;
   }
 
   /** A nest is gone. Say so, briefly and happily. */
-  showNestCleared(reward: number, total: number): void {
+  showNestCleared(reward: number, total: number, leftHere: number): void {
     this.toast.innerHTML =
       '<div style="color:#c084fc;letter-spacing:0.1em;font-size:12px">NEST DESTROYED</div>' +
       '<div style="margin-top:6px">+' + reward + ' essence</div>' +
-      '<div style="color:#9fb3c8;font-size:12px;margin-top:3px">' + total + ' banked</div>';
+      '<div style="color:#9fb3c8;font-size:12px;margin-top:3px">' + total + ' banked</div>' +
+      // Counting DOWN rather than up, so the end of a neighbourhood is visible
+      // from a long way off and finishing it is something to aim at.
+      '<div style="color:#7d8fa1;font-size:11.5px;margin-top:5px">' +
+      leftHere + ' left around here</div>';
     this.toast.style.display = 'block';
     this.toast.style.opacity = '1';
     setTimeout(() => (this.toast.style.opacity = '0'), 2600);
     setTimeout(() => (this.toast.style.display = 'none'), 3100);
+  }
+
+  /**
+   * The one moment in this game that means "done".
+   *
+   * Held on screen far longer than anything else, because it is the end of a
+   * session's worth of walking and the game has never had an ending before.
+   */
+  showNeighbourhoodClear(bonus: number): void {
+    this.toast.innerHTML =
+      '<div style="color:#4ade80;letter-spacing:0.14em;font-size:12px">NEIGHBOURHOOD CLEAR</div>' +
+      '<div style="margin-top:7px;font-weight:700">+' + bonus + ' essence</div>' +
+      '<div style="color:#9fb3c8;font-size:12px;margin-top:6px;max-width:250px;line-height:1.5">' +
+      'Every nest around here is gone. It will be quiet until they come back in a few hours — ' +
+      'the next lot are a walk away.</div>';
+    this.toast.style.display = 'block';
+    this.toast.style.opacity = '1';
+    setTimeout(() => (this.toast.style.opacity = '0'), 6500);
+    setTimeout(() => (this.toast.style.display = 'none'), 7000);
   }
 
   /**
