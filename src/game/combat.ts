@@ -109,6 +109,26 @@ export class Combat {
   private regenPausedFor = 0;
   /** Counts down to the next low-health warning. */
   private dangerCountdown = 0;
+  /**
+   * True while standing at a building you own.
+   *
+   * It does NOT suspend the rule that healing stops while something is hurting
+   * you -- that rule is what makes breaking away the way you recover, and two
+   * earlier attempts at suspending it produced plain immunity. It shortens the
+   * pause instead, so you come back quickly between scrapes and still cannot
+   * stand in a swarm.
+   */
+  /**
+   * Extra chance of money dropping, because we are on ground somebody owns.
+   *
+   * Owning a building deliberately grants NO survival at all -- see the note in
+   * the tuning file about two attempts that produced immunity instead.
+   */
+  private pitchCoinBonus = 0;
+
+  setPitchCoinBonus(bonus: number): void {
+    this.pitchCoinBonus = bonus;
+  }
   /** Damage taken since the last "you are being hurt" sound. */
   private hurtSincePlayed = 0;
 
@@ -1535,7 +1555,7 @@ export class Combat {
       }
 
       // Money is rarer than experience, and buys things that outlast the run.
-      if (this.random() < TUNING.player.coinDropChance + this.coinBonus) {
+      if (this.random() < TUNING.player.coinDropChance + this.coinBonus + this.pitchCoinBonus) {
         const coin = this.entities.spawn(EntityKind.COIN, dropLng, dropLat, 1.3);
         if (coin >= 0) {
           this.entities.value[coin] = TUNING.player.coinValue;

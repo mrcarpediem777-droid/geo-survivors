@@ -1026,6 +1026,59 @@ export const TUNING = {
     radiusMetres: 3,
   },
 
+  /* ---------------------------------------------------------------------- */
+  /* PROPERTY -- buildings you own                                           */
+  /* ---------------------------------------------------------------------- */
+  property: {
+    /**
+     * What a building costs: a floor, plus more for a bigger footprint.
+     *
+     * The square root in `priceOf` keeps the range narrow on purpose. A
+     * warehouse costing fifty times a corner shop would make the choice
+     * arithmetic; costing four times makes it taste.
+     */
+    basePrice: 180,
+    pricePerRootMetre: 26,
+    /** How near you must be standing to buy or use one. */
+    reachMetres: 22,
+
+    /**
+     * WHAT OWNING ONE GIVES: somewhere to recover.
+     *
+     * Deliberately not a gun -- towers already do that, and a second thing that
+     * shoots would just be a tower with an address. A building is the opposite
+     * half of the same walk: healing normally stops entirely while anything is
+     * hurting you, and near a building you own it does not. That is what turns a
+     * place you own into somewhere you retreat TO, which is the behaviour this
+     * whole game is built to reward.
+     */
+    /**
+     * WHAT OWNING ONE GIVES: money, not survival.
+     *
+     * Two earlier attempts made it a safe place to stand, and both were wrong in
+     * the same way. A flat trickle of healing was plain immunity -- health never
+     * fell at all. Shortening the "no healing while hurt" pause instead turned
+     * out to be a switch rather than a dial: measured, at two seconds the player
+     * survived two hundred seconds and never dropped below 76%, and at three
+     * seconds they died at 80 -- indistinguishable from owning nothing. There
+     * was no setting in between that meant anything.
+     *
+     * A lever with no middle is the wrong lever. So a building does not make you
+     * harder to kill at all: it makes the ground around it PAY BETTER. Money
+     * cannot make you immortal, so there is nothing to exploit by standing
+     * there -- the swarm still kills you on exactly the same schedule -- and it
+     * turns WHICH building into a real decision, because the good corner is the
+     * one near the nests.
+     *
+     * It is also the right shape for what this becomes later. When somebody can
+     * outbid you, what they are buying is a pitch that earns, and that is a
+     * thing worth squabbling over.
+     */
+    earnsWithinMetres: 60,
+    /** Extra chance of a dead monster leaving money, near a place you own. */
+    extraCoinChance: 0.2,
+  },
+
   performance: {
     /** What we are aiming for on a mid-range Android. */
     targetFps: 60,

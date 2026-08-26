@@ -544,6 +544,11 @@ ${data.distanceMetres.toFixed(0)} m`;
       onBuild: () => void;
       onUpgrade: () => void;
     },
+    property: {
+      owned: number;
+      offer: { areaSquareMetres: number; price: number; affordable: boolean; owned: boolean } | null;
+      onBuy: () => void;
+    },
     audio: {
       soundOn: boolean;
       hapticsOn: boolean;
@@ -803,6 +808,62 @@ ${data.distanceMetres.toFixed(0)} m`;
       note.textContent = 'Walk a little further from your nearest tower to build another.';
       this.shopScreen.appendChild(note);
     }
+
+    // ----- property -------------------------------------------------------
+    const propHeading = document.createElement('div');
+    propHeading.innerHTML =
+      '<div style="font:700 12px/1 ui-monospace,monospace;color:#fbbf24;letter-spacing:0.14em;margin-bottom:2px">PROPERTY</div>' +
+      '<div style="font:400 11.5px/1.45 system-ui,sans-serif;color:#9fb3c8;max-width:300px">' +
+      'Real buildings, bought by standing at them. Monsters killed near one you own ' +
+      '<b>drop far more money</b>. It does not make you any harder to kill — buy the ' +
+      'corner with the nests.</div>' +
+      '<div style="font:400 11px/1.4 system-ui,sans-serif;color:#5b6b7d;margin-top:4px">' +
+      'You own ' + property.owned + '.</div>';
+    propHeading.style.textAlign = 'center';
+    propHeading.style.margin = '16px 0 10px';
+    this.shopScreen.appendChild(propHeading);
+
+    const propRow = document.createElement('button');
+    const canBuy = !!property.offer && !property.offer.owned && property.offer.affordable;
+    Object.assign(propRow.style, {
+      width: 'min(340px, 88vw)',
+      marginBottom: '9px',
+      padding: '11px 14px',
+      borderRadius: '11px',
+      border: canBuy ? '1px solid rgba(251,191,36,0.55)' : '1px solid rgba(255,255,255,0.12)',
+      background: canBuy ? 'rgba(251,191,36,0.12)' : 'rgba(255,255,255,0.04)',
+      color: canBuy ? '#e6edf3' : '#7d8fa1',
+      textAlign: 'left',
+      cursor: canBuy ? 'pointer' : 'default',
+      display: 'flex',
+      gap: '12px',
+      alignItems: 'center',
+    } satisfies Partial<CSSStyleDeclaration>);
+
+    if (!property.offer) {
+      propRow.innerHTML =
+        '<span style="font-size:20px;width:26px;text-align:center">🏚️</span>' +
+        '<span style="flex:1"><span style="display:block;font:700 13px system-ui,sans-serif">No building within reach</span>' +
+        '<span style="display:block;font:400 11.5px/1.35 system-ui,sans-serif;color:#9fb3c8">' +
+        'Walk up to one and look again.</span></span>';
+    } else if (property.offer.owned) {
+      propRow.innerHTML =
+        '<span style="font-size:20px;width:26px;text-align:center">🏠</span>' +
+        '<span style="flex:1"><span style="display:block;font:700 13px system-ui,sans-serif">This one is yours</span>' +
+        '<span style="display:block;font:400 11.5px/1.35 system-ui,sans-serif;color:#9fb3c8">' +
+        property.offer.areaSquareMetres + ' m² · nobody can take it</span></span>' +
+        '<span style="font:700 12px ui-monospace,monospace;color:#4ade80">OWNED</span>';
+    } else {
+      propRow.innerHTML =
+        '<span style="font-size:20px;width:26px;text-align:center">🏢</span>' +
+        '<span style="flex:1"><span style="display:block;font:700 13px system-ui,sans-serif">Buy this building</span>' +
+        '<span style="display:block;font:400 11.5px/1.35 system-ui,sans-serif;color:#9fb3c8">' +
+        property.offer.areaSquareMetres + ' m² — bigger ones cost more</span></span>' +
+        '<span style="font:700 12px ui-monospace,monospace;color:' +
+        (property.offer.affordable ? '#fbbf24' : '#5b6b7d') + '">' + property.offer.price + '</span>';
+      if (canBuy) propRow.addEventListener('click', property.onBuy);
+    }
+    this.shopScreen.appendChild(propRow);
 
     // ----- settings ------------------------------------------------------
     const settingsHeading = document.createElement('div');
