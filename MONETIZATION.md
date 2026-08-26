@@ -121,28 +121,44 @@ Multiplayer here also needs **no live sync**: outbidding is asynchronous, and
 nobody's position is ever shared -- which is a privacy decision as much as a cost
 one.
 
-### Measured: what one session pulls
+### Measured: what one session actually pulls
 
-A cold start on a Da Nang street: **15 tile requests, 711 kB, about 47 kB a
-tile**. A real forty-five minute walk crosses new ground, so call it **50-70
-tiles and 2-4 MB a session** -- estimated from that anchor, not measured on foot.
+A cold start on a Da Nang street pulls **nine map tiles at zoom 14, about 378 kB**,
+plus roughly 330 kB of style, sprites and fonts that are fetched once and never
+again.
+
+Nine, not the fifty to seventy this document first guessed. The guess was wrong
+because it assumed the picture of the map and the geometry we use for walls were
+two separate streams. **They are the same tiles**: the style tops out at zoom 14
+and stretches, and we read buildings, water and streets out of exactly those. A
+zoom-14 tile is over two kilometres across, so somebody walking their own
+neighbourhood asks for **the same nine tiles every day, forever**.
 
 ### The bill, by size
 
-| | backend + hosting | **map tiles, paid per request** | **map tiles, self-hosted** |
-|---|---|---|---|
-| 1,000 daily players | free - $25/mo | ~$450/mo | ~$20/mo |
-| 10,000 daily players | $25 - $50/mo | ~$4,500/mo | ~$40/mo |
-| 100,000 daily players | $100 - $300/mo | ~$45,000/mo | ~$100/mo |
+| | backend + hosting | tiles paid for, not cached | tiles paid for, cached | tiles self-hosted |
+|---|---|---|---|---|
+| 1,000 daily players | free - $25/mo | ~$70/mo | ~$8/mo | ~$5 - 20/mo |
+| 10,000 daily players | $25 - $50/mo | ~$675/mo | ~$75/mo | ~$20/mo |
+| 100,000 daily players | $100 - $300/mo | ~$6,750/mo | ~$750/mo | ~$40 - 100/mo |
 
-**The database is not the problem. The map is.** At roughly $0.25 per thousand
-tile requests -- a typical commercial rate -- tiles at 10,000 players cost about
-$4,500 a month, which is almost exactly the ad revenue those same players
-generate. The business closes to zero on map hosting alone.
+At a typical commercial rate of about $0.25 per thousand tile requests. Compare
+with the revenue in the section below: at 10,000 players the ads earn roughly
+$4,500 a month, so **even the worst column here is affordable** -- and the
+rightmost one is a rounding error.
 
-Self-hosted, the same traffic is 840 GB a month, which sits inside the included
-bandwidth of a single ordinary rented server. **Roughly a hundredfold
-difference**, and it is the single most important number in this document.
+### The single biggest lever, and it costs nothing
+
+**Caching the map on the phone.** The service worker now keeps up to 300 tiles,
+about 12 MB -- a couple of photographs, holding several neighbourhoods' worth of
+ground. A regular walker downloads their city once and never again, which takes
+the running cost of an established player to roughly zero and makes the game work
+in a lift.
+
+That reverses an earlier decision in this project, and the reasoning behind it is
+worth keeping: the original note said filling a phone with a city's worth of map
+was not ours to do **quietly and without limit**. That was right about the danger
+and wrong about the conclusion. The answer was a cap, not a refusal.
 
 ### We are already most of the way there
 
