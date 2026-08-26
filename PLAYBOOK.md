@@ -10,7 +10,7 @@ Claude: *"Read PLAYBOOK.md and tell me where we left off."*
 | | |
 |---|---|
 | **Milestone reached** | **M5 — clearing nests and permanent progress** ✅ |
-| **Next milestone** | M9 — the map's meaning: bridges exist; street kinds next |
+| **Next milestone** | M9 — the map's meaning: bridges, and streets that differ by kind |
 | **Code lives at** | https://github.com/mrcarpediem777-droid/geo-survivors |
 | **Live URL** | **https://geo-survivors.vercel.app** |
 | **Vercel dashboard** | https://vercel.com/abc-70f4/geo-survivors |
@@ -1031,14 +1031,59 @@ exactly the chokepoint a bridge should be, without a line of level design being
 written by hand. Deliberately stamped **narrower** than an ordinary road for the
 same reason.
 
-### What the map is still not being asked
+### Streets are no longer all the same
 
-`kind`, `tunnel` and the rest are now carried through and only `bridge` is used.
-One tile of Da Nang holds 8 primary roads, 14 service roads, 6 footways, 3
-flights of steps, 5 alleys and 3 pedestrian streets, and the game treats them
-identically — plus whole layers never opened at all (`street_polygons`,
-`bridges`, `pois`, `sites`). Steps that slow a swarm, alleys that funnel it,
-squares with no cover: all of that is now one table away rather than a rewrite.
+Fifteen kinds of street, each with a width and a travel cost, in
+`TUNING.navigation.streetKinds`. Two numbers doing two different jobs:
+
+**Width** is what makes an alley feel like an alley. A swarm on a six-lane road
+arrives as a wall; the same swarm up a service lane arrives in single file,
+because there is only room for single file.
+
+**Cost** decides which way the swarm *routes*, not merely how fast it walks.
+Measured on a real street, route-cost accumulated per metre:
+
+```
+tier 0  main roads   x1.00    3.52 per metre
+tier 1  residential  x1.15    3.75 per metre
+tier 2  service      x1.35    4.43 per metre
+```
+
+A metre of back alley costs the router 26% more than a metre of main road, so
+monsters pour down the big streets and only trickle up the small ones. Steps cost
+x3.2 -- the best place in the neighbourhood to be standing when hunted.
+
+Railways, runways and taxiways are excluded outright. Both of the last two appear
+in the street layer around Da Nang, and a swarm marching down an airport runway
+would be a strange thing to ship.
+
+**The cost cap is not decoration.** The router walks a ring of 113 buckets and
+the dearest possible step is 14 x 8, so multipliers are quantised into eight
+tiers and capped. That exact class of bug has already happened here once, when an
+off-street penalty of 49 against a 15-bucket ring silently made whole districts
+unreachable. Checked after this change: **7,547 of 7,594 road squares still
+reachable**, the 47 being genuinely isolated fragments.
+
+Cost in time: painting the streets went from 3.7 ms to 6.7 ms, and that happens
+only when the walls are rebuilt. **The routing rebuild, which runs several times
+a second, is unchanged at 4.2 ms** -- which is the whole reason the tiers are a
+lookup table rather than a multiplication in the inner loop.
+
+### What this does NOT prove
+
+That the difference is *felt* on any given street. At the Da Nang test point the
+player stands on a service lane and the ground within 40 m is **95% one kind of
+street**, so every monster that reached them walked on the same tier and no
+comparison was possible. The mechanism is proven; whether a neighbourhood has
+enough variety for it to matter depends on the neighbourhood.
+
+An earlier version of that check reported "every monster on one tier" as though
+it were a fault, because it guessed the grid arithmetic by hand and got the
+origin wrong. `streetTierAt` exists now so the field is asked rather than
+second-guessed.
+
+Still unopened: `street_polygons` (pedestrian squares), `bridges`, `pois`,
+`sites`.
 
 ---
 

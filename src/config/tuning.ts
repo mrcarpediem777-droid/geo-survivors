@@ -808,6 +808,59 @@ export const TUNING = {
      * plainly a bottleneck -- which is the whole reason it is interesting.
      */
     bridgeHalfWidthMetres: 7,
+
+    /**
+     * WHAT KIND OF STREET IT IS, AND WHAT THAT MEANS FOR THE SWARM.
+     *
+     * Every one of these was being read out of the map and thrown away. A
+     * six-lane road, a back alley and a flight of concrete steps were the same
+     * thing to the game -- which is a strange way to treat the one feature no
+     * other game of this sort has, namely that the level is your actual street.
+     *
+     * Two numbers each:
+     *
+     *   halfWidth -- how wide the swarm may spread on it. This is what makes an
+     *     alley feel like an alley: they come at you in single file instead of a
+     *     wall, and a main road is where the wall comes from.
+     *
+     *   cost -- how slow it is to travel. Pathfinding prefers cheap ground, so
+     *     this decides which way the swarm ROUTES, not just how fast it walks.
+     *     Monsters pour down the main road and only trickle up the steps.
+     *
+     * COST IS CAPPED HARD AT 4 AND QUANTISED. The router walks a ring of 113
+     * buckets and the dearest possible step is 14 x 8, so a careless multiplier
+     * makes whole districts unreachable -- that exact bug has already happened
+     * here once, when an off-street penalty of 49 against a 15-bucket ring
+     * silently cut the map in half. See PLAYBOOK.
+     */
+    streetKinds: {
+      motorway: { halfWidth: 6.5, cost: 1 },
+      trunk: { halfWidth: 6, cost: 1 },
+      primary: { halfWidth: 5.5, cost: 1 },
+      secondary: { halfWidth: 4.5, cost: 1 },
+      tertiary: { halfWidth: 4, cost: 1.1 },
+      residential: { halfWidth: 3.2, cost: 1.15 },
+      living_street: { halfWidth: 3, cost: 1.15 },
+      unclassified: { halfWidth: 3, cost: 1.2 },
+      /** Driveways, yards, and the alleys behind shophouses. Tight. */
+      service: { halfWidth: 2, cost: 1.35 },
+      /** A square or a promenade: wide, open, nowhere to hide. */
+      pedestrian: { halfWidth: 5, cost: 1 },
+      footway: { halfWidth: 1.6, cost: 1.5 },
+      path: { halfWidth: 1.5, cost: 1.7 },
+      track: { halfWidth: 2.2, cost: 1.5 },
+      cycleway: { halfWidth: 1.8, cost: 1.2 },
+      /** Clambering. The single best place to be standing when hunted. */
+      steps: { halfWidth: 1.2, cost: 3.2 },
+    } as Record<string, { halfWidth: number; cost: number }>,
+    /** Anything the map calls something we have not thought about. */
+    defaultStreetKind: { halfWidth: 2.6, cost: 1.2 },
+    /**
+     * Kinds nothing may ever walk on, however the map draws them. A railway is
+     * not a footpath and a runway is not a high street, and both appear in the
+     * street layer around Da Nang.
+     */
+    notWalkable: ['rail', 'runway', 'taxiway'],
   },
 
   /* ---------------------------------------------------------------------- */

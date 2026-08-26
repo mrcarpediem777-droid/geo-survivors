@@ -66,6 +66,13 @@ const UNREACHABLE = 0x7fffffff;
  * dearest possible step.
  */
 const MAX_STEP_PENALTY = 8;
+/**
+ * How many distinct street costs there can be. Street multipliers are rounded
+ * into these, so the router can look a step up instead of working it out.
+ */
+const STREET_TIERS = 8;
+/** Tier n means this multiplier. Nothing may exceed MAX_STEP_PENALTY. */
+const TIER_MULTIPLIER = [1, 1.15, 1.35, 1.5, 1.7, 2.2, 2.7, 3.2];
 const BUCKET_COUNT = DIAGONAL_COST * MAX_STEP_PENALTY + 1;
 
 /**
@@ -103,6 +110,17 @@ export class FlowField {
    * wrong for a game whose whole idea is that your streets are the corridors.
    */
   private onStreet = new Uint8Array(SIZE * SIZE);
+  /**
+   * Which tier of street each square belongs to, 0 (a main road) to 7 (steps).
+   *
+   * Kept as a tier rather than a multiplier so the cost of a step stays a
+   * LOOKUP. This inner loop runs eight times for every one of ~17,000 squares
+   * several times a second; a multiply and a round in there is not free, and the
+   * whole rebuild has a 4 ms budget.
+   */
+  private streetTier = new Uint8Array(SIZE * SIZE);
+  /** tier * 8 + direction -> whole-number cost. Filled by rasteriseStreets. */
+  private tierStepCost = new Int32Array(STREET_TIERS * 8);
 
   /** How much dearer a step is when it leaves the road. */
   private offStreetPenalty = 1;
@@ -204,13 +222,45 @@ export class FlowField {
     metresPerLng: number,
     halfWidthMetres: number,
     penalty: number,
-    strict: boolean
+    strict: boolean,
+    /** Width and cost per street kind. Without it every street is the same. */
+    kinds?: {
+      byKind: Record<string, { halfWidth: number; cost: number }>;
+      fallback: { halfWidth: number; cost: number };
+      notWalkable: string[];
+    }
   ): void {
     this.offStreetPenalty = Math.min(penalty, MAX_STEP_PENALTY);
     for (let n = 0; n < 8; n++) {
       this.offStreetCost[n] = Math.round(NEIGHBOUR_COST[n] * this.offStreetPenalty);
     }
+    // The lookup the router uses instead of doing arithmetic per step.
+    for (let tier = 0; tier < STREET_TIERS; tier++) {
+      const multiplier = Math.min(TIER_MULTIPLIER[tier], MAX_STEP_PENALTY);
+      for (let n = 0; n < 8; n++) {
+        this.tierStepCost[tier * 8 + n] = Math.round(NEIGHBOUR_COST[n] * multiplier);
+      }
+    }
+    this.streetTier.fill(0);
     let painted = 0;
+
+    /** Nearest tier for a multiplier, so the table stays small. */
+    const tierFor = (cost: number): number => {
+      let best = 0;
+      let bestGap = Infinity;
+      for (let t = 0; t < STREET_TIERS; t++) {
+        const gap = Math.abs(TIER_MULTIPLIER[t] - cost);
+        if (gap < bestGap) {
+          bestGap = gap;
+          best = t;
+        }
+      }
+      return best;
+    };
+
+    // A set rather than an array: this is asked once per street, and there are
+    // several thousand of them.
+    const notWalkable = kinds ? new Set(kinds.notWalkable) : null;
 
     const stampRadius = Math.max(1, Math.round(halfWidthMetres / CELL_METRES));
 
@@ -231,9 +281,21 @@ export class FlowField {
        * has to funnel onto it.
        */
       const isBridge = street.bridge === true;
+
+      // What kind of street is this, and what does the map say it is like?
+      const rule = kinds ? (kinds.byKind[street.kind] ?? kinds.fallback) : null;
+
+      // A railway is not a footpath and a runway is not a high street. Both turn
+      // up in the street layer around Da Nang, and letting a swarm march down a
+      // runway would be a strange thing to ship.
+      if (notWalkable !== null && notWalkable.has(street.kind)) continue;
+
+      const tier = rule ? tierFor(rule.cost) : 0;
       const radius = isBridge
         ? Math.max(1, Math.round((halfWidthMetres * 0.8) / CELL_METRES))
-        : stampRadius;
+        : rule
+          ? Math.max(1, Math.round(rule.halfWidth / CELL_METRES))
+          : stampRadius;
       const points = street.coords;
       for (let i = 0; i + 3 < points.length; i += 2) {
         const ax = (points[i] - originLng) * metresPerLng;
@@ -265,7 +327,14 @@ export class FlowField {
                 if (!isBridge) continue;
                 this.blocked[index] = 0;
               }
-              if (!this.onStreet[index]) painted++;
+              if (!this.onStreet[index]) {
+                painted++;
+                this.streetTier[index] = tier;
+              } else if (tier < this.streetTier[index]) {
+                // Two streets over one square: the better one wins. A footpath
+                // crossing a main road must not make the road slow.
+                this.streetTier[index] = tier;
+              }
               this.onStreet[index] = 1;
             }
           }
@@ -385,7 +454,7 @@ export class FlowField {
             // therefore the arrows -- hug the streets.
             // Rounded to a whole number: the bucket ring only works on integers.
             const stepCost = this.onStreet[neighbourIndex]
-              ? NEIGHBOUR_COST[n]
+              ? this.tierStepCost[this.streetTier[neighbourIndex] * 8 + n]
               : this.offStreetCost[n];
             const newCost = cost + stepCost;
             if (newCost < this.distance[neighbourIndex]) {
@@ -556,6 +625,22 @@ export class FlowField {
   /** Are there enough roads here to insist monsters use them? */
   streetsAreUsable(): boolean {
     return this.streetsOnly;
+  }
+
+  /**
+   * Which tier of street this spot is, or -1 for none.
+   *
+   * Exists so the effect of the street-kind table can be MEASURED rather than
+   * assumed -- the first attempt at checking it guessed the grid maths by hand,
+   * got the origin wrong, and reported every monster standing on the same kind
+   * of road, which was nonsense.
+   */
+  streetTierAt(worldX: number, worldY: number): number {
+    const cx = this.worldToCellX(worldX);
+    const cy = this.worldToCellY(worldY);
+    if (cx < 0 || cy < 0 || cx >= SIZE || cy >= SIZE) return -1;
+    const index = cy * SIZE + cx;
+    return this.onStreet[index] ? this.streetTier[index] : -1;
   }
 
   /** Is this spot on a road? For checking the routing actually works. */
