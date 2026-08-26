@@ -99,6 +99,73 @@ interrupts a run, ever.
 
 ---
 
+## What a server and multiplayer would actually cost
+
+Asked directly, so here it is with the arithmetic shown. **Prices are
+approximate and move around** -- treat the shape of the answer as the useful
+part, not the exact figures.
+
+### The thing that makes this cheap was designed in from the start
+
+The world is **calculated, never stored**. Two phones standing together roll the
+same nests from the same geohash and time slot, with nobody coordinating them.
+So a server never has to hold or send the world -- only **what people did to
+it**: who owns which building, what it cost, who outbid whom, and each player's
+own coins and towers.
+
+That is a handful of small writes per session and one read on opening the app.
+It is close to the cheapest possible shape of backend, and it is the difference
+between a $25/month bill and a $1,000/month one.
+
+Multiplayer here also needs **no live sync**: outbidding is asynchronous, and
+nobody's position is ever shared -- which is a privacy decision as much as a cost
+one.
+
+### Measured: what one session pulls
+
+A cold start on a Da Nang street: **15 tile requests, 711 kB, about 47 kB a
+tile**. A real forty-five minute walk crosses new ground, so call it **50-70
+tiles and 2-4 MB a session** -- estimated from that anchor, not measured on foot.
+
+### The bill, by size
+
+| | backend + hosting | **map tiles, paid per request** | **map tiles, self-hosted** |
+|---|---|---|---|
+| 1,000 daily players | free - $25/mo | ~$450/mo | ~$20/mo |
+| 10,000 daily players | $25 - $50/mo | ~$4,500/mo | ~$40/mo |
+| 100,000 daily players | $100 - $300/mo | ~$45,000/mo | ~$100/mo |
+
+**The database is not the problem. The map is.** At roughly $0.25 per thousand
+tile requests -- a typical commercial rate -- tiles at 10,000 players cost about
+$4,500 a month, which is almost exactly the ad revenue those same players
+generate. The business closes to zero on map hosting alone.
+
+Self-hosted, the same traffic is 840 GB a month, which sits inside the included
+bandwidth of a single ordinary rented server. **Roughly a hundredfold
+difference**, and it is the single most important number in this document.
+
+### We are already most of the way there
+
+The tile mirror built while chasing the blank-map bug is exactly this
+infrastructure: `vercel.json` rewrites `/maptiles/*` to a provider, and the game
+asks through that path. Pointing it at our own tile server is a **configuration
+change, not a rewrite**. What it would need is a planet extract (about 100 GB,
+free from OpenStreetMap) and a machine to serve it.
+
+Until then the game uses free public providers, which are donation-funded and
+carry no guarantee. That is fine for one player and **not fine at any real
+scale**: leaning on a charity's bandwidth for a commercial game is both fragile
+and rude.
+
+### What is not in these numbers
+
+Accounts and moderation once people can take things from each other -- that is
+support work, not server cost, and it grows with players rather than with
+traffic. Also nothing here covers app-store fees (30%, or 15% under the small
+business rates), which come off the Premium price before any of this.
+
+---
+
 ## The honest maths, kept here so it is not forgotten
 
 Rewarded video earns roughly **$5–20 per 1,000 completed views**, varying enormously by
