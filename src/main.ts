@@ -19,6 +19,7 @@ import { watchBattery, offerLowPower } from './app/battery';
 import * as rewardedAd from './app/rewardedAd';
 import { Journal } from './app/journal';
 import { Sound, Haptics } from './app/sound';
+import { RemoteLedger } from './net/ledger';
 import { Profile } from './profile/profile';
 import { PlayerLocation } from './location/playerLocation';
 import { MapView } from './map/mapView';
@@ -161,6 +162,21 @@ async function boot(): Promise<void> {
   // quietly turns "go for a walk" into "stare at a phone near traffic". See the
   // note at the top of sound.ts.
   game.useSound(new Sound(profile.get().soundOn), new Haptics(profile.get().hapticsOn));
+
+  // 6f. THE LEDGER ---------------------------------------------------------
+  // Ask once whether there is a server. Until somebody sets one up the answer
+  // is no, and the game keeps everything on the phone exactly as before -- the
+  // shared version is an addition, never a requirement. Nothing waits on this:
+  // it is checked in the background and swapped in if it answers.
+  void fetch('/api/ledger?lat=0&lng=0&radius=1')
+    .then((response) => (response.ok ? response.json() : { configured: false }))
+    .then((body: { configured?: boolean }) => {
+      if (body.configured === false) return;
+      const data = profile.get();
+      game.useLedger(new RemoteLedger(data.deviceId, () => profile.get().playerName));
+      console.info('[ledger] connected — buildings are shared');
+    })
+    .catch(() => undefined);
   journal.record('opened', { installed: profile.get().installedToHomeScreen });
 
   // 6c. THE BATTERY --------------------------------------------------------

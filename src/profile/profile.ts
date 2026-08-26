@@ -92,10 +92,39 @@ export interface ProfileData {
    * buying things off each other; see MONETIZATION.md.
    */
   ownedBuildings: { key: string; lat: number; lng: number; paid: number; boughtAtMs: number }[];
+
+  /*
+   * WHO THIS PLAYER IS, as far as anything outside this phone is concerned.
+   *
+   * A random number made on this device and never linked to a person. There is
+   * no sign-up, no email, no password: opening the game is the whole of it. The
+   * cost is honest and worth stating -- change your phone or clear your browser
+   * and this is gone, and with it everything you owned. A transfer code can fix
+   * that later without ever asking anybody for an email address.
+   *
+   * The server sees this and the chosen name. It never sees where anybody
+   * walked: the journal that records that stays on the phone. See net/ledger.ts.
+   */
+  deviceId: string;
+  /** What other players see next to a building. Chosen, changeable, not a name. */
+  playerName: string;
   /** Every piece of equipment bought so far, by id. */
   ownedEquipment: string[];
   /** Which item is worn in each of the three slots. Empty means nothing. */
   equippedBySlot: Record<string, string>;
+}
+
+/**
+ * A random label for this device.
+ *
+ * `crypto.randomUUID` where it exists, and a plain random string where it does
+ * not -- some older phone browsers lack it, and a game that refuses to start
+ * because of a missing convenience function would be a poor trade.
+ */
+function makeDeviceId(): string {
+  const maybe = globalThis.crypto as { randomUUID?: () => string } | undefined;
+  if (maybe?.randomUUID) return maybe.randomUUID();
+  return 'dev-' + Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
 const STORAGE_KEY = 'geo-survivors.profile';
@@ -126,6 +155,8 @@ function freshProfile(): ProfileData {
     clearedByCell: {},
     towers: [],
     ownedBuildings: [],
+    deviceId: makeDeviceId(),
+    playerName: '',
   };
 }
 
@@ -177,6 +208,10 @@ export class Profile {
           // it has never been on sale before.
           ownedEquipment: parsed.ownedEquipment ?? [],
           equippedBySlot: parsed.equippedBySlot ?? {},
+          // Keep the label if there is one: losing it would hand somebody a new
+          // identity and orphan everything they own.
+          deviceId: parsed.deviceId ?? makeDeviceId(),
+          playerName: parsed.playerName ?? '',
         };
       }
 
