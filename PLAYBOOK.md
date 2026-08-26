@@ -10,7 +10,7 @@ Claude: *"Read PLAYBOOK.md and tell me where we left off."*
 | | |
 |---|---|
 | **Milestone reached** | **M5 — clearing nests and permanent progress** ✅ |
-| **Next milestone** | M12 — buildings you own; the social half awaits a server |
+| **Next milestone** | M13 — a measuring instrument that fails loudly |
 | **Code lives at** | https://github.com/mrcarpediem777-droid/geo-survivors |
 | **Live URL** | **https://geo-survivors.vercel.app** |
 | **Vercel dashboard** | https://vercel.com/abc-70f4/geo-survivors |
@@ -1226,6 +1226,49 @@ this interesting — being outbid, the price ratcheting up, a whole street quiet
 competing over the same cafe — needs a server and a second player. Everything
 here is shaped so that half drops in without a rewrite: an owner, a price, and a
 record of what was paid.
+
+---
+
+
+## The measuring instrument, in the repository at last
+
+Every balance number in these documents came from running the real game
+headlessly. Until now that code was typed fresh into a browser console each
+time, and in a single afternoon it went wrong four separate ways:
+
+1. **The screen-off pause froze runs silently.** The game correctly stops when
+   the page is hidden, and the pane these measurements run in *is* hidden. A
+   frozen run looks exactly like one that survived. The same setup measured three
+   times gave 156 kills, 140 kills and 40 kills.
+2. **A tower test measured a bridge a kilometre outside the navigation grid**,
+   where everything reads as blocked, and proved nothing.
+3. **A street-kind check computed grid coordinates by hand**, got the origin
+   wrong, and reported a fault that did not exist.
+4. **My own first fix made it worse.** Replacing the real clock with "a nice
+   round million" made "time since the routes were rebuilt" *negative*, so the
+   swarm navigated a stale map for the whole run and the game looked far easier
+   than it is — 109 kills and a comfortable survival where the truth is death at
+   about eighty seconds.
+
+All four have one cause: an instrument nobody could see failing. It now lives in
+`src/dev/harness.ts` with every one of those traps disarmed in code and explained
+in comments, behind the same dev-tools flag as everything else, so it cannot
+reach a player's build.
+
+```
+await __geo.harness.run()                 // the standard set
+await __geo.harness.run({ repeats: 5 })   // more repeats, less noise
+```
+
+**It prints every run, not just the summary.** That is the point. The first thing
+it revealed about itself was that two runs of the same setup could differ by more
+than double — which had been true all along and invisible. With the clock fixed
+the same three runs read 79 s, 130 s and 77 s: two agreeing closely and one
+outlier, all of it now on the page instead of hidden behind an average.
+
+**So: single runs of this game mean very little.** Anything reported from here
+should come from the median of several, with the spread shown. Numbers in these
+documents from before this harness existed should be read with that in mind.
 
 ---
 
