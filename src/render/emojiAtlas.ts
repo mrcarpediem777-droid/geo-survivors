@@ -55,6 +55,7 @@ export const SPRITE_NAMES = [
   'nest',
   'you',
   'shot',
+  'tower',
   'bladedancer',
   'sniper',
   'bruiser',
@@ -74,6 +75,7 @@ export const SPRITES = [
   '🕳️', // nest
   '🔵', // you
   '✦', // shot
+  '🗼', // tower -- a gun you built and left behind
   '🌀', // bladedancer
   '🎯', // sniper
   '🛡️', // bruiser
@@ -96,6 +98,7 @@ export const SpriteIndex = {
   NEST: spriteIndexByName('nest'),
   PLAYER: spriteIndexByName('you'),
   PROJECTILE: spriteIndexByName('shot'),
+  TOWER: spriteIndexByName('tower'),
 } as const;
 
 export interface AtlasInfo {

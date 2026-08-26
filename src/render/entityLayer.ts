@@ -52,6 +52,7 @@ const SPRITE_FOR_KIND: Record<number, number> = {
   [EntityKind.COIN]: SpriteIndex.COIN,
   [EntityKind.PICKUP]: SpriteIndex.COIN,
   [EntityKind.NEST]: SpriteIndex.NEST,
+  [EntityKind.TOWER]: SpriteIndex.TOWER,
   [EntityKind.TEST_MARKER]: SpriteIndex.XP,
 };
 

@@ -388,6 +388,7 @@ export class Combat {
       const cap = TUNING.player.crowdPressure.maxPerSecond * deltaSeconds;
       this.damagePlayer(Math.min(this.pressureDamageThisFrame, cap));
     }
+    this.fireTowers(deltaSeconds, playerX, playerY);
     this.fireWeapons(deltaSeconds, playerX, playerY);
     this.updateProjectiles(deltaSeconds);
     this.updateOrbs(deltaSeconds, playerX, playerY);
@@ -442,6 +443,15 @@ export class Combat {
     this.anchorX = x;
     this.anchorY = y;
   }
+
+  /*
+   * TOWERS -- guns you built and left behind.
+   *
+   * Held here as plain positions in metres rather than as profile records, so
+   * the fight never has to know what a save file is. The game hands them over
+   * when the world is built and again whenever one is bought.
+   */
+  towerSpots: { x: number; y: number; level: number; cooldown: number; entityId: EntityId }[] = [];
 
   /** Extra chance of money dropping, from the chosen character. */
   private coinBonus = 0;
@@ -558,7 +568,7 @@ export class Combat {
     const progress = this.maturityOf(nest);
     // Ease in, so a fresh nest is gentle and a mature one is relentless.
     const eased = progress * progress;
-    const interval =
+    let interval =
       TUNING.nests.startingSpawnIntervalSeconds +
       (TUNING.nests.fastestSpawnIntervalSeconds - TUNING.nests.startingSpawnIntervalSeconds) * eased;
 
@@ -576,6 +586,9 @@ export class Combat {
     // rate and works up to the full multiplier as the nest dies, so arriving is
     // survivable, the last stretch is the hard part, and stepping back to breathe
     // costs only the gentle decay rather than your life.
+    // A tower nearby throttles it, whether or not anybody is clearing it.
+    interval /= this.suppressionAt(nest.x, nest.y);
+
     if (!nest.beingCaptured) return interval;
 
     // Two things hold it back: how far through its destruction we are, and how
@@ -989,6 +1002,83 @@ export class Combat {
           }
       }
     }
+  }
+
+  /**
+   * Towers shoot for themselves, but only while you are near enough for them to
+   * wake. That is the rule that stops a fortified corner replacing a walk: a
+   * sleeping tower kills nothing, so there is nothing to farm by sitting still.
+   */
+  private fireTowers(deltaSeconds: number, playerX: number, playerY: number): void {
+    if (this.towerSpots.length === 0) return;
+    const T = TUNING.towers;
+
+    for (const tower of this.towerSpots) {
+      const toPlayer = Math.hypot(tower.x - playerX, tower.y - playerY);
+      if (toPlayer > T.wakeWithinMetres) continue;
+
+      tower.cooldown -= deltaSeconds;
+      if (tower.cooldown > 0) continue;
+
+      const level = tower.level;
+      const range = T.rangeMetres * (1 + (level - 1) * T.rangePerLevel);
+      const target = this.nearestMonster(tower.x, tower.y, range);
+      if (target < 0) {
+        tower.cooldown = 0.2;
+        continue;
+      }
+
+      tower.cooldown = T.intervalSeconds / (1 + (level - 1) * T.fireRatePerLevel);
+      const damage = T.damage * (1 + (level - 1) * T.damagePerLevel);
+
+      const store = this.entities;
+      const dx = this.collision.toLocalX(store.lng[target]) - tower.x;
+      const dy = this.collision.toLocalY(store.lat[target]) - tower.y;
+      const distance = Math.hypot(dx, dy) || 1;
+      this.spawnPlayerShot(
+        tower.x,
+        tower.y,
+        dx / distance,
+        dy / distance,
+        damage,
+        0,
+        range,
+        TUNING.weapons.startingBoltSpeedMps
+      );
+    }
+  }
+
+  /**
+   * How much a tower nearby slows this nest down.
+   *
+   * The other half of what a tower is for: it does not merely shoot the things
+   * that arrive, it makes fewer of them arrive. Building one changes the
+   * neighbourhood rather than only the next thirty seconds.
+   */
+  private suppressionAt(x: number, y: number): number {
+    if (this.towerSpots.length === 0) return 1;
+    const T = TUNING.towers;
+    let strongest = 0;
+    for (const tower of this.towerSpots) {
+      // A SLEEPING TOWER DOES NOTHING AT ALL, suppression included.
+      //
+      // This was the half I got wrong first time. Shooting already stopped when
+      // you walked away, but throttling the nests did not -- so a tower parked
+      // two hundred metres off still thinned the swarm, and measured, a run that
+      // died at 81 seconds survived the full two hundred because of a tower the
+      // player could not even see. That is exactly the "fortify a corner and sit
+      // in it" the whole design is meant to prevent, arriving through the back
+      // door. Both halves sleep together now.
+      const toPlayer = Math.hypot(tower.x - this.anchorX, tower.y - this.anchorY);
+      if (toPlayer > T.wakeWithinMetres) continue;
+
+      const d = Math.hypot(tower.x - x, tower.y - y);
+      if (d >= T.suppressWithinMetres) continue;
+      strongest = Math.max(strongest, 1 - d / T.suppressWithinMetres);
+    }
+    if (strongest <= 0) return 1;
+    // Full strength right on top of it, fading to nothing at the edge.
+    return 1 - (1 - T.suppressionShare) * strongest;
   }
 
   private intervalFor(id: string): number {

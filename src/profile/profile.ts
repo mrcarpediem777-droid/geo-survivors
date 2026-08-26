@@ -74,6 +74,15 @@ export interface ProfileData {
    * to come back this evening.
    */
   clearedByCell: Record<string, { slot: number; count: number }>;
+  /**
+   * Guns you have built and left standing in real places.
+   *
+   * The first thing this game genuinely STORES rather than calculates. The
+   * determinism notes always anticipated this: a server would never have to
+   * send the world, only what people did to it -- and this is the first of
+   * those things.
+   */
+  towers: { lat: number; lng: number; level: number; builtAtMs: number }[];
   /** Every piece of equipment bought so far, by id. */
   ownedEquipment: string[];
   /** Which item is worn in each of the three slots. Empty means nothing. */
@@ -106,6 +115,7 @@ function freshProfile(): ProfileData {
     soundOn: true,
     hapticsOn: false,
     clearedByCell: {},
+    towers: [],
   };
 }
 

@@ -38,6 +38,7 @@ import { bonusesFrom, costToBuy, META_UPGRADES, type MetaLevels } from './metaPr
 import { CHARACTERS, characterById } from './characters';
 import { bonusesFromEquipment, itemById } from './equipment';
 import { preloadAd, watchAdFor } from '../app/rewardedAd';
+import { costOfNextTower, costOfUpgrade, nearestTower } from './towers';
 import type { Journal } from '../app/journal';
 import type { Sound, Haptics } from '../app/sound';
 import type { Profile } from '../profile/profile';
@@ -173,6 +174,96 @@ export class Game {
     const record = this.profile?.get().clearedByCell[this.currentCell];
     const cleared = record && record.slot === this.currentSlot ? record.count : 0;
     return Math.max(0, TUNING.nests.perNeighbourhood - cleared);
+  }
+
+  /**
+   * Put every tower the player owns onto the map, as things that exist.
+   *
+   * Called whenever the world is rebuilt and whenever one is bought. Only towers
+   * near enough to matter are placed -- one built across town is still owned,
+   * still permanent, and simply not here.
+   */
+  private placeTowers(): void {
+    for (const spot of this.combat.towerSpots) {
+      if (spot.entityId >= 0) this.entities.release(spot.entityId);
+    }
+    this.combat.towerSpots = [];
+
+    const towers = this.profile?.get().towers ?? [];
+    for (const tower of towers) {
+      const x = this.collision.toLocalX(tower.lng);
+      const y = this.collision.toLocalY(tower.lat);
+      if (Math.hypot(x, y) > TUNING.walls.loadRadiusMetres) continue;
+
+      const entityId = this.entities.spawn(
+        EntityKind.TOWER,
+        tower.lng,
+        tower.lat,
+        TUNING.towers.radiusMetres
+      );
+      this.combat.towerSpots.push({ x, y, level: tower.level, cooldown: 0, entityId });
+    }
+  }
+
+  /**
+   * What building here would cost, and whether it is allowed.
+   *
+   * Returns null when there is nowhere to build -- too close to one you already
+   * own, or no idea where you are yet.
+   */
+  towerOffer(): { cost: number; affordable: boolean } | null {
+    if (!this.profile || !this.anchor) return null;
+    const data = this.profile.get();
+    const near = nearestTower(data.towers, this.anchor.lat, this.anchor.lng);
+    if (near && near.metres < TUNING.towers.minimumSpacingMetres) return null;
+    const cost = costOfNextTower(data.towers.length, TUNING.towers.baseCost, TUNING.towers.costGrowth);
+    return { cost, affordable: data.essence >= cost };
+  }
+
+  /** Build one where the player is really standing. */
+  buildTowerHere(): void {
+    const offer = this.towerOffer();
+    if (!offer || !offer.affordable || !this.profile || !this.anchor) return;
+    const data = this.profile.get();
+
+    this.profile.update({
+      essence: data.essence - offer.cost,
+      towers: [
+        ...data.towers,
+        { lat: this.anchor.lat, lng: this.anchor.lng, level: 1, builtAtMs: Date.now() },
+      ],
+    });
+    this.placeTowers();
+    this.journal?.record('tower-built', { cost: offer.cost, owned: data.towers.length + 1 });
+    this.hud.showNote('Tower built. It is yours for good — nothing can take it.');
+    this.sound?.play('nestCleared');
+  }
+
+  /** What upgrading the tower you are standing next to would cost, if any. */
+  upgradeOffer(): { level: number; cost: number; affordable: boolean } | null {
+    if (!this.profile || !this.anchor) return null;
+    const data = this.profile.get();
+    const near = nearestTower(data.towers, this.anchor.lat, this.anchor.lng);
+    if (!near || near.metres > TUNING.towers.minimumSpacingMetres) return null;
+    const cost = costOfUpgrade(near.tower.level, TUNING.towers.baseCost, TUNING.towers.upgradeGrowth);
+    return { level: near.tower.level, cost, affordable: data.essence >= cost };
+  }
+
+  /** Pay again at a tower you are standing next to, to make it stronger. */
+  upgradeNearestTower(): void {
+    if (!this.profile || !this.anchor) return;
+    const data = this.profile.get();
+    const near = nearestTower(data.towers, this.anchor.lat, this.anchor.lng);
+    if (!near || near.metres > TUNING.towers.minimumSpacingMetres) return;
+
+    const cost = costOfUpgrade(near.tower.level, TUNING.towers.baseCost, TUNING.towers.upgradeGrowth);
+    if (data.essence < cost) return;
+
+    const towers = data.towers.map((t, i) => (i === near.index ? { ...t, level: t.level + 1 } : t));
+    this.profile.update({ essence: data.essence - cost, towers });
+    this.placeTowers();
+    this.journal?.record('tower-upgraded', { cost, level: near.tower.level + 1 });
+    this.hud.showNote('Tower is now level ' + (near.tower.level + 1) + '.');
   }
 
   /** The noise, and the buzz. See `sound.ts` for why these are not decoration. */
@@ -322,6 +413,19 @@ export class Game {
       },
       this.journal?.summary() ?? 'nothing recorded yet',
       () => this.exportJournal(),
+      {
+        owned: this.profile?.get().towers.length ?? 0,
+        offer: this.towerOffer(),
+        upgrade: this.upgradeOffer(),
+        onBuild: () => {
+          this.buildTowerHere();
+          this.openShop();
+        },
+        onUpgrade: () => {
+          this.upgradeNearestTower();
+          this.openShop();
+        },
+      },
       {
         soundOn: this.sound?.isEnabled() ?? false,
         hapticsOn: this.haptics?.isEnabled() ?? false,
@@ -787,6 +891,9 @@ export class Game {
       this.currentCell = cell.cell;
       this.currentSlot = cell.timeSlot;
       this.combat.placeNests(cell.seed);
+
+      // Towers belong to real places, so they come back whenever the world does.
+      this.placeTowers();
 
       this.wallsBuiltAt = { ...around };
     } catch (error) {

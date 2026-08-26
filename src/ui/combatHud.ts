@@ -535,6 +535,15 @@ ${data.distanceMetres.toFixed(0)} m`;
     onLowPower: (on: boolean) => void,
     journalSummary: string,
     onExportJournal: () => void,
+    towers: {
+      owned: number;
+      /** Null when there is nowhere to build right here. */
+      offer: { cost: number; affordable: boolean } | null;
+      /** Set when standing next to one you already own. */
+      upgrade: { level: number; cost: number; affordable: boolean } | null;
+      onBuild: () => void;
+      onUpgrade: () => void;
+    },
     audio: {
       soundOn: boolean;
       hapticsOn: boolean;
@@ -716,6 +725,83 @@ ${data.distanceMetres.toFixed(0)} m`;
         button.addEventListener('click', () => onBuy(upgrade.id));
       }
       this.shopScreen.appendChild(button);
+    }
+
+    // ----- towers ---------------------------------------------------------
+    const towerHeading = document.createElement('div');
+    towerHeading.innerHTML =
+      '<div style="font:700 12px/1 ui-monospace,monospace;color:#5eead4;letter-spacing:0.14em;margin-bottom:2px">TOWERS</div>' +
+      '<div style="font:400 11.5px/1.45 system-ui,sans-serif;color:#9fb3c8;max-width:300px">' +
+      'Built where you are standing. They shoot on their own, hold back the nests ' +
+      'around them, and <b>nothing can ever take one from you</b> — you never have to ' +
+      'come back and defend it.</div>' +
+      '<div style="font:400 11px/1.4 system-ui,sans-serif;color:#5b6b7d;margin-top:4px">' +
+      'You own ' + towers.owned + '. They only wake when you are near, so fortifying ' +
+      'one corner and sitting in it does nothing.</div>';
+    towerHeading.style.textAlign = 'center';
+    towerHeading.style.margin = '16px 0 10px';
+    this.shopScreen.appendChild(towerHeading);
+
+    const towerButton = (
+      label: string,
+      note: string,
+      cost: number,
+      affordable: boolean,
+      onClick: () => void
+    ) => {
+      const button = document.createElement('button');
+      Object.assign(button.style, {
+        width: 'min(340px, 88vw)',
+        marginBottom: '9px',
+        padding: '11px 14px',
+        borderRadius: '11px',
+        border: affordable ? '1px solid rgba(94,234,212,0.6)' : '1px solid rgba(255,255,255,0.12)',
+        background: affordable ? 'rgba(94,234,212,0.12)' : 'rgba(255,255,255,0.04)',
+        color: affordable ? '#e6edf3' : '#7d8fa1',
+        textAlign: 'left',
+        cursor: affordable ? 'pointer' : 'default',
+        display: 'flex',
+        gap: '12px',
+        alignItems: 'center',
+      } satisfies Partial<CSSStyleDeclaration>);
+      button.innerHTML =
+        '<span style="font-size:20px;width:26px;text-align:center">🗼</span>' +
+        '<span style="flex:1">' +
+        '<span style="display:block;font:700 13px system-ui,sans-serif">' + label + '</span>' +
+        '<span style="display:block;font:400 11.5px/1.35 system-ui,sans-serif;color:#9fb3c8">' + note + '</span>' +
+        '</span>' +
+        '<span style="font:700 12px ui-monospace,monospace;color:' +
+        (affordable ? '#5eead4' : '#5b6b7d') + '">' + cost + '</span>';
+      if (affordable) button.addEventListener('click', onClick);
+      this.shopScreen.appendChild(button);
+    };
+
+    if (towers.offer) {
+      towerButton(
+        'Build one here',
+        'Right where you are standing now.',
+        towers.offer.cost,
+        towers.offer.affordable,
+        towers.onBuild
+      );
+    }
+    if (towers.upgrade) {
+      towerButton(
+        'Upgrade this one to level ' + (towers.upgrade.level + 1),
+        'Hits harder, reaches further, fires faster.',
+        towers.upgrade.cost,
+        towers.upgrade.affordable,
+        towers.onUpgrade
+      );
+    }
+    if (!towers.offer && !towers.upgrade) {
+      const note = document.createElement('div');
+      note.style.cssText =
+        'width:min(340px,88vw);margin-bottom:9px;padding:11px 14px;border-radius:11px;' +
+        'border:1px dashed rgba(255,255,255,0.12);color:#7d8fa1;' +
+        'font:400 11.5px/1.45 system-ui,sans-serif;text-align:center';
+      note.textContent = 'Walk a little further from your nearest tower to build another.';
+      this.shopScreen.appendChild(note);
     }
 
     // ----- settings ------------------------------------------------------
