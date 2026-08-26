@@ -10,7 +10,7 @@ Claude: *"Read PLAYBOOK.md and tell me where we left off."*
 | | |
 |---|---|
 | **Milestone reached** | **M5 — clearing nests and permanent progress** ✅ |
-| **Next milestone** | M13 — a measuring instrument that fails loudly |
+| **Next milestone** | M14 — the ledger, ready for a server that does not exist yet |
 | **Code lives at** | https://github.com/mrcarpediem777-droid/geo-survivors |
 | **Live URL** | **https://geo-survivors.vercel.app** |
 | **Vercel dashboard** | https://vercel.com/abc-70f4/geo-survivors |
@@ -1269,6 +1269,54 @@ outlier, all of it now on the page instead of hidden behind an average.
 **So: single runs of this game mean very little.** Anything reported from here
 should come from the median of several, with the spread shown. Numbers in these
 documents from before this harness existed should be read with that in mind.
+
+---
+
+
+## The ledger: built before the server, on purpose
+
+A server for this game only ever has to remember **what people did** -- who owns
+which building and what they paid. Everything else is calculated on the phone.
+That is written down as an interface with exactly three methods in
+`src/net/ledger.ts`, and a local implementation that runs entirely on the phone
+today.
+
+The game already goes through it. Buying a building is a claim that can be
+**refused**, and the refusal path is exercised now rather than being discovered
+the day somebody else is on the other end.
+
+Verified against a stubbed rival owner who paid 900:
+
+```
+underbid  435 vs 900  ->  refused, no coins taken, owns nothing
+outbid   1455 vs 900  ->  1455 taken, owned, recorded at 1455
+```
+
+The next buyer must now beat 1455. That ratchet is the whole mechanic, working
+before there is anybody to use it on.
+
+**It found a real bug immediately.** The first version deducted the coins and
+stopped, because with the local ledger the ownership write had already happened
+as a side effect. Against any other ledger that meant **paying and receiving
+nothing** -- 1,455 coins for zero buildings. A fault that only appears once there
+is somebody to buy from is exactly what building this early is for.
+
+### Two rules written into the file, not left to memory
+
+**The client is not believed about money.** A phone saying "I have ten thousand
+coins, sell me the cafe" is a claim, not a fact. With one player and nothing to
+take from anyone, trusting it costs nothing; the moment a purchase can take
+something from somebody else, the balance has to live where the player cannot
+edit it. `LocalLedger` says in its own comments that it is **not** a security
+model, so nobody later mistakes it for one.
+
+**Ownership is public; where somebody walks never is.** Being outbid only works
+if ownership is visible. But a building somebody bought is usually near where
+they live, and a public record of who owns what and when they bought it is a
+tool for finding people. The ledger therefore carries an owner's chosen **name**
+and nothing else: no identifier that follows them elsewhere, no times, no
+positions, no history. The journal of how far somebody walked stays on their own
+phone and never goes near this.
 
 ---
 
