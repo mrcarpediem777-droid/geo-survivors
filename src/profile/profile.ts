@@ -83,6 +83,15 @@ export interface ProfileData {
    * those things.
    */
   towers: { lat: number; lng: number; level: number; builtAtMs: number }[];
+  /**
+   * Buildings you have bought.
+   *
+   * Only the ones somebody actually owns are stored -- the PRICE of every other
+   * building on Earth is worked out from its own footprint whenever it is
+   * needed. That is what keeps this affordable when it becomes a game about
+   * buying things off each other; see MONETIZATION.md.
+   */
+  ownedBuildings: { key: string; lat: number; lng: number; paid: number; boughtAtMs: number }[];
   /** Every piece of equipment bought so far, by id. */
   ownedEquipment: string[];
   /** Which item is worn in each of the three slots. Empty means nothing. */
@@ -116,6 +125,7 @@ function freshProfile(): ProfileData {
     hapticsOn: false,
     clearedByCell: {},
     towers: [],
+    ownedBuildings: [],
   };
 }
 

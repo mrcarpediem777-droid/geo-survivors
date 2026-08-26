@@ -270,6 +270,46 @@ export class CollisionWorld {
     return false;
   }
 
+  /**
+   * The building nearest a point, for buying and standing in.
+   *
+   * Water is skipped -- you cannot own a river, and the one time somebody tries
+   * it should not silently sell them one.
+   */
+  nearestBuilding(
+    x: number,
+    y: number,
+    withinMetres: number
+  ): { points: Float32Array; minX: number; minY: number; maxX: number; maxY: number; metres: number } | null {
+    let best: {
+      points: Float32Array;
+      minX: number;
+      minY: number;
+      maxX: number;
+      maxY: number;
+      metres: number;
+    } | null = null;
+
+    for (const wall of this.walls) {
+      if (wall.isWater) continue;
+      const centreX = (wall.minX + wall.maxX) / 2;
+      const centreY = (wall.minY + wall.maxY) / 2;
+      const metres = Math.hypot(centreX - x, centreY - y);
+      if (metres > withinMetres) continue;
+      if (!best || metres < best.metres) {
+        best = {
+          points: wall.points,
+          minX: wall.minX,
+          minY: wall.minY,
+          maxX: wall.maxX,
+          maxY: wall.maxY,
+          metres,
+        };
+      }
+    }
+    return best;
+  }
+
   resolveCircle(
     x: number,
     y: number,

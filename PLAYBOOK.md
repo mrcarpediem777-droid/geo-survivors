@@ -10,7 +10,7 @@ Claude: *"Read PLAYBOOK.md and tell me where we left off."*
 | | |
 |---|---|
 | **Milestone reached** | **M5 — clearing nests and permanent progress** ✅ |
-| **Next milestone** | M11 — towers you build and leave behind |
+| **Next milestone** | M12 — buildings you own; the social half awaits a server |
 | **Code lives at** | https://github.com/mrcarpediem777-droid/geo-survivors |
 | **Live URL** | **https://geo-survivors.vercel.app** |
 | **Vercel dashboard** | https://vercel.com/abc-70f4/geo-survivors |
@@ -1181,6 +1181,68 @@ run completing.
 The lesson is the one this project keeps relearning in new clothes: an instrument
 that cannot fail loudly will eventually fail quietly, and a measurement nobody
 can see failing is worse than no measurement at all.
+
+---
+
+
+## Owning a building (M12) — and the price nobody has to store
+
+You can buy a **real building** by standing at it. Monsters killed near one you
+own leave far more money: measured over three hundred kills each, **19.7% of them
+dropped a coin on ordinary ground and 37.7% on ground you own**.
+
+It grants **no survival whatsoever**, and that is deliberate — see below.
+
+### The price is calculated, never stored
+
+Every phone works out what a building is worth from its own footprint: a floor
+plus the square root of its area. Same building, same answer, everywhere, with
+nobody coordinating. Prices near the test point ranged from 238 for a 5 m² shed
+to 2,219 for a 6,152 m² warehouse — **a footprint range of 1,200× compressed into
+9× of price**, so choosing which building stays a matter of taste rather than
+arithmetic.
+
+Identity works the same way: a building is named by its own rounded corners.
+Verified by buying one, reloading, rebuilding the world from a **different
+origin**, and standing there again — same key, same price, still owned.
+
+That is the whole point. When this becomes a game about buying things off each
+other, a server never has to hold a catalogue of prices for every building on
+Earth. It only remembers the handful somebody actually bought and what they paid.
+It is the same rule the nests follow, and it is the difference between a $20
+backend and a $1,000 one.
+
+### Two wrong answers before the right one
+
+The obvious benefit was "somewhere safe to fall back to", and it was wrong twice.
+
+**A flat trickle of healing near it** was plain immunity: standing at your own
+building, health simply never fell — 100% after two and a half minutes, where the
+same spot without one ended at 49%.
+
+**Shortening the "no healing while hurt" pause** instead turned out to be a
+switch rather than a dial. At two seconds the player survived two hundred seconds
+and never dropped below 76%; at three seconds they died at 80, which is
+indistinguishable from owning nothing at all. There was no setting in between
+that meant anything.
+
+**A lever with no middle is the wrong lever.** So a building does not touch
+survival: it makes the ground around it pay better. Money cannot make anybody
+immortal, so there is nothing to exploit by standing there — the swarm kills you
+on exactly the same schedule — and it turns *which* building into a real decision,
+because the good corner is the one near the nests.
+
+It is also the right shape for what comes next: when somebody can outbid you,
+what they are buying is **a pitch that earns**, and that is a thing worth
+squabbling over.
+
+### What is deliberately missing
+
+Nobody can take one from you, because there is nobody else. The half that makes
+this interesting — being outbid, the price ratcheting up, a whole street quietly
+competing over the same cafe — needs a server and a second player. Everything
+here is shaped so that half drops in without a rewrite: an owner, a price, and a
+record of what was paid.
 
 ---
 

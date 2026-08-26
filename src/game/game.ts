@@ -39,6 +39,7 @@ import { CHARACTERS, characterById } from './characters';
 import { bonusesFromEquipment, itemById } from './equipment';
 import { preloadAd, watchAdFor } from '../app/rewardedAd';
 import { costOfNextTower, costOfUpgrade, nearestTower } from './towers';
+import { buildingKeyFor, priceOf, footprintArea } from './property';
 import type { Journal } from '../app/journal';
 import type { Sound, Haptics } from '../app/sound';
 import type { Profile } from '../profile/profile';
@@ -239,6 +240,87 @@ export class Game {
     this.sound?.play('nestCleared');
   }
 
+  /**
+   * The building you are standing at, what it costs, and whether it is yours.
+   *
+   * The price comes out of the building's own footprint every time it is asked,
+   * never out of storage -- which is what will let a server hold only the ones
+   * somebody actually bought instead of a catalogue of every building on Earth.
+   */
+  propertyOffer(): {
+    key: string;
+    areaSquareMetres: number;
+    price: number;
+    affordable: boolean;
+    owned: boolean;
+  } | null {
+    if (!this.profile || !this.anchor) return null;
+    const x = this.collision.toLocalX(this.anchor.lng);
+    const y = this.collision.toLocalY(this.anchor.lat);
+    const building = this.collision.nearestBuilding(x, y, TUNING.property.reachMetres);
+    if (!building) return null;
+
+    const key = buildingKeyFor(
+      this.collision.toLng(building.minX),
+      this.collision.toLat(building.minY),
+      this.collision.toLng(building.maxX),
+      this.collision.toLat(building.maxY)
+    );
+    const area = footprintArea(building.points);
+    const data = this.profile.get();
+    const owned = data.ownedBuildings.some((b) => b.key === key);
+    const price = priceOf(area, TUNING.property.basePrice, TUNING.property.pricePerRootMetre);
+
+    return {
+      key,
+      areaSquareMetres: Math.round(area),
+      price,
+      affordable: data.essence >= price,
+      owned,
+    };
+  }
+
+  /** Buy the building you are standing at. */
+  buyBuildingHere(): void {
+    const offer = this.propertyOffer();
+    if (!offer || offer.owned || !offer.affordable || !this.profile || !this.anchor) return;
+    const data = this.profile.get();
+
+    this.profile.update({
+      essence: data.essence - offer.price,
+      ownedBuildings: [
+        ...data.ownedBuildings,
+        {
+          key: offer.key,
+          lat: this.anchor.lat,
+          lng: this.anchor.lng,
+          paid: offer.price,
+          boughtAtMs: Date.now(),
+        },
+      ],
+    });
+    this.journal?.record('building-bought', {
+      price: offer.price,
+      area: offer.areaSquareMetres,
+      owned: data.ownedBuildings.length + 1,
+    });
+    this.hud.showNote('Bought. Monsters dying near it will leave far more money.');
+    this.sound?.play('nestCleared');
+  }
+
+  /** How much better this ground pays, because we own something on it. */
+  private pitchBonus(): number {
+    if (!this.profile || !this.anchor) return 0;
+    const T = TUNING.property;
+    for (const building of this.profile.get().ownedBuildings) {
+      const dy = (this.anchor.lat - building.lat) * 111320;
+      const dx =
+        (this.anchor.lng - building.lng) * 111320 * Math.cos((this.anchor.lat * Math.PI) / 180);
+      if (Math.hypot(dx, dy) < T.earnsWithinMetres) return T.extraCoinChance;
+    }
+    return 0;
+  }
+
   /** What upgrading the tower you are standing next to would cost, if any. */
   upgradeOffer(): { level: number; cost: number; affordable: boolean } | null {
     if (!this.profile || !this.anchor) return null;
@@ -423,6 +505,14 @@ export class Game {
         },
         onUpgrade: () => {
           this.upgradeNearestTower();
+          this.openShop();
+        },
+      },
+      {
+        owned: this.profile?.get().ownedBuildings.length ?? 0,
+        offer: this.propertyOffer(),
+        onBuy: () => {
+          this.buyBuildingHere();
           this.openShop();
         },
       },
@@ -1074,6 +1164,7 @@ export class Game {
         );
       }
 
+      this.combat.setPitchCoinBonus(this.pitchBonus());
       this.combat.update(deltaSeconds, px, py);
       this.combat.checkEnemyShots(px, py);
 
