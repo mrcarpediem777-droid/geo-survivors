@@ -40,6 +40,7 @@ import { bonusesFromEquipment, itemById } from './equipment';
 import { preloadAd, watchAdFor } from '../app/rewardedAd';
 import { costOfNextTower, costOfUpgrade, nearestTower } from './towers';
 import { buildingKeyFor, priceOf, footprintArea } from './property';
+import { LocalLedger, type Ledger } from '../net/ledger';
 import type { Journal } from '../app/journal';
 import type { Sound, Haptics } from '../app/sound';
 import type { Profile } from '../profile/profile';
@@ -158,6 +159,36 @@ export class Game {
   private metresWalkedThisRun = 0;
   /** The log, if there is one. */
   journal: Journal | null = null;
+
+  /**
+   * Who owns what. Runs entirely on the phone today; the same three methods
+   * point at a server later without the game noticing. See `net/ledger.ts`.
+   */
+  private ledger: Ledger = new LocalLedger(
+    () =>
+      (this.profile?.get().ownedBuildings ?? []).map((b) => ({
+        key: b.key,
+        lat: b.lat,
+        lng: b.lng,
+        ownerName: 'you',
+        mine: true,
+        paid: b.paid,
+      })),
+    (entries) =>
+      this.profile?.update({
+        ownedBuildings: entries.map((e) => ({
+          key: e.key,
+          lat: e.lat,
+          lng: e.lng,
+          paid: e.paid,
+          boughtAtMs: Date.now(),
+        })),
+      })
+  );
+
+  useLedger(ledger: Ledger): void {
+    this.ledger = ledger;
+  }
 
   /**
    * The patch of world we are standing in, and how much of it is left.
@@ -280,32 +311,60 @@ export class Game {
     };
   }
 
-  /** Buy the building you are standing at. */
+  /**
+   * Buy the building you are standing at.
+   *
+   * Goes through the ledger even though the ledger is currently this phone.
+   * That matters: a purchase that can be REFUSED is a path the game has to
+   * handle, and building it now means the day somebody outbids you, nothing
+   * here changes. Money is taken only after the claim succeeds, in that order,
+   * because the reverse is how people lose coins to a lost connection.
+   */
   buyBuildingHere(): void {
     const offer = this.propertyOffer();
     if (!offer || offer.owned || !offer.affordable || !this.profile || !this.anchor) return;
-    const data = this.profile.get();
 
-    this.profile.update({
-      essence: data.essence - offer.price,
-      ownedBuildings: [
-        ...data.ownedBuildings,
-        {
-          key: offer.key,
-          lat: this.anchor.lat,
-          lng: this.anchor.lng,
-          paid: offer.price,
+    const lat = this.anchor.lat;
+    const lng = this.anchor.lng;
+
+    void this.ledger.claim(offer.key, lat, lng, offer.price).then((result) => {
+      if (!result.ok) {
+        this.hud.showNote(result.reason ?? 'Somebody got there first.');
+        return;
+      }
+      /*
+       * RECORD WHAT THE LEDGER SAYS WE NOW OWN, not merely what we spent.
+       *
+       * The first version deducted the coins and stopped there, because with the
+       * local ledger the write had already happened as a side effect. Against
+       * any other ledger that meant paying and receiving nothing: measured with
+       * a stubbed rival owner, outbidding them took 1,455 coins and left the
+       * player owning zero buildings. A bug that only appears once there is
+       * somebody to buy from is exactly the sort this whole exercise exists to
+       * find early.
+       */
+      const data = this.profile!.get();
+      const entry = result.entry;
+      const owned = data.ownedBuildings.filter((b) => b.key !== offer.key);
+      if (entry) {
+        owned.push({
+          key: entry.key,
+          lat: entry.lat,
+          lng: entry.lng,
+          paid: entry.paid,
           boughtAtMs: Date.now(),
-        },
-      ],
+        });
+      }
+      this.profile!.update({ essence: data.essence - offer.price, ownedBuildings: owned });
+      this.journal?.record('building-bought', {
+        price: offer.price,
+        area: offer.areaSquareMetres,
+        owned: data.ownedBuildings.length,
+        shared: this.ledger.isShared(),
+      });
+      this.hud.showNote('Bought. Monsters dying near it will leave far more money.');
+      this.sound?.play('nestCleared');
     });
-    this.journal?.record('building-bought', {
-      price: offer.price,
-      area: offer.areaSquareMetres,
-      owned: data.ownedBuildings.length + 1,
-    });
-    this.hud.showNote('Bought. Monsters dying near it will leave far more money.');
-    this.sound?.play('nestCleared');
   }
 
   /** How much better this ground pays, because we own something on it. */
