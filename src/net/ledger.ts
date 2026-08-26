@@ -121,3 +121,68 @@ export class LocalLedger implements Ledger {
     return { ok: true, entry };
   }
 }
+
+/**
+ * The one that talks to our own server.
+ *
+ * Falls back to silence rather than to failure: if the server is not
+ * configured, or unreachable, `around` returns nothing and `claim` refuses
+ * politely. A player halfway through a walk with no signal must not be told the
+ * game is broken -- they simply cannot buy anything until they are back in
+ * range, which is the truth.
+ */
+export class RemoteLedger implements Ledger {
+  private deviceId: string;
+  private playerName: () => string;
+  private configured = true;
+
+  constructor(deviceId: string, playerName: () => string) {
+    this.deviceId = deviceId;
+    this.playerName = playerName;
+  }
+
+  isShared(): boolean {
+    return this.configured;
+  }
+
+  async around(lat: number, lng: number, radiusMetres: number): Promise<LedgerEntry[]> {
+    try {
+      const response = await fetch(
+        `/api/ledger?lat=${lat}&lng=${lng}&radius=${Math.round(radiusMetres)}` +
+          `&deviceId=${encodeURIComponent(this.deviceId)}`
+      );
+      if (!response.ok) return [];
+      const body = (await response.json()) as { configured?: boolean; entries?: LedgerEntry[] };
+      this.configured = body.configured !== false;
+      return body.entries ?? [];
+    } catch {
+      // No signal. Not an error worth showing anybody.
+      return [];
+    }
+  }
+
+  async claim(key: string, lat: number, lng: number, offer: number): Promise<ClaimResult> {
+    try {
+      const response = await fetch('/api/ledger', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          deviceId: this.deviceId,
+          playerName: this.playerName(),
+          key,
+          lat,
+          lng,
+          offer,
+        }),
+      });
+      const body = (await response.json()) as ClaimResult & { configured?: boolean };
+      if (body.configured === false) {
+        this.configured = false;
+        return { ok: false, reason: 'Not connected to anything yet.' };
+      }
+      return body;
+    } catch {
+      return { ok: false, reason: 'No signal — try again when you are back in range.' };
+    }
+  }
+}
