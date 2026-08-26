@@ -43,6 +43,14 @@ export const EntityKind = {
    * and long-term progress are earned separately.
    */
   COIN: 7,
+  /**
+   * A gun you built and left behind.
+   *
+   * The first thing in this game that is BUILT rather than found or calculated:
+   * it belongs to a real place, it stays there when you go home, and nothing can
+   * ever take it away from you. See `towers.ts`.
+   */
+  TOWER: 8,
 } as const;
 
 export type EntityKindValue = (typeof EntityKind)[keyof typeof EntityKind];
@@ -57,6 +65,7 @@ export const KIND_COLOURS: Record<number, [number, number, number, number]> = {
   [EntityKind.TEST_MARKER]: [180, 180, 190, 200], // grey -- a debug aid, never loot
   [EntityKind.XP_ORB]: [120, 220, 255, 255], // pale blue -- experience
   [EntityKind.COIN]: [255, 200, 50, 255], // gold -- money
+  [EntityKind.TOWER]: [110, 220, 200, 255], // teal -- yours, and permanent
 };
 
 /** A handle to one entity. It is just its slot number in the arrays. */

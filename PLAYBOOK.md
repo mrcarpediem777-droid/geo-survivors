@@ -10,7 +10,7 @@ Claude: *"Read PLAYBOOK.md and tell me where we left off."*
 | | |
 |---|---|
 | **Milestone reached** | **M5 — clearing nests and permanent progress** ✅ |
-| **Next milestone** | M10 — monsters that behave differently, not just harder |
+| **Next milestone** | M11 — towers you build and leave behind |
 | **Code lives at** | https://github.com/mrcarpediem777-droid/geo-survivors |
 | **Live URL** | **https://geo-survivors.vercel.app** |
 | **Vercel dashboard** | https://vercel.com/abc-70f4/geo-survivors |
@@ -1125,6 +1125,62 @@ heavier than a swarmer and make up roughly a third of spawns. The health slope i
 unchanged in shape. The core loop still works: a brand-new player clears their
 first nest at **85 s** (was 70) and reaches level 11, because the new monsters are
 worth more. Peak 120 monsters, median frame 0.80 ms, 99th 5.4 ms.
+
+---
+
+
+## Towers (M11) — the first thing in this game that is BUILT
+
+Everything else on the map is found or calculated. A tower is neither: you pay
+for it, you walk to the spot, and it stays there after you go home. Built
+**anywhere you like**, not only on cleared nests, because choosing the spot is
+the decision.
+
+It shoots by itself, and it throttles nests near it — both halves, so building
+one changes the neighbourhood rather than only the next thirty seconds. Measured
+with forty monsters standing around the player for ten seconds: **8 killed with
+no tower, 44 with one**.
+
+**Three rules it is built around, all from the brief:**
+
+**Nothing can ever take it from you.** No decay, no attack in your absence, no
+maintenance. The moment an owned thing can be lost while you are away, you hurry
+to it — across roads, at night, looking at a phone — which is the one behaviour
+this game refuses to cause. A tower you forget about costs you nothing.
+
+**It adds no input to combat.** It fires like every other weapon here. Building
+happens on the map, not in a fight.
+
+**It must not replace walking.** A tower only wakes within 90 m of you, so
+fortifying a corner and sitting in it achieves nothing: a sleeping tower kills
+nothing and throttles nothing, so there is nothing to farm. Prices rise steeply
+(260, 403, 625, …) so towers stay a decision about *where*, and no two may sit
+closer than 35 m.
+
+---
+
+## The measurement harness had been lying, and it was my own doing
+
+While testing towers, the same configuration measured three times gave "survived
+200 s, 156 kills", "survived 200 s, 140 kills", and "died at 95 s, 59 kills".
+That is not noise, that is a broken instrument — and every tower comparison built
+on it was worthless, including a "bug" it led me to find and fix.
+
+The cause was the screen-off pause added in M6: the game correctly stops dead
+when `document.hidden` is true, and the browser pane these measurements run in
+**is** hidden. So runs silently froze partway, and a frozen run looks exactly
+like a run that survived without dying. The game was right; the harness was
+measuring nothing and reporting it as a result.
+
+**Balance numbers reported between M6 and here should be treated as unreliable**
+unless they were taken with `hidden` forced false, which the harness now does
+every tick. Structural results — does a thing exist, does it fire, does a cost
+curve rise, does a rule hold — were unaffected, because those never depended on a
+run completing.
+
+The lesson is the one this project keeps relearning in new clothes: an instrument
+that cannot fail loudly will eventually fail quietly, and a measurement nobody
+can see failing is worse than no measurement at all.
 
 ---
 

@@ -975,6 +975,57 @@ export const TUNING = {
   /* ---------------------------------------------------------------------- */
   /* PERFORMANCE                                                             */
   /* ---------------------------------------------------------------------- */
+  /* ---------------------------------------------------------------------- */
+  /* TOWERS -- the things you build and leave behind                         */
+  /* ---------------------------------------------------------------------- */
+  towers: {
+    /**
+     * Cost of the FIRST one, and how much dearer each next one is.
+     *
+     * Steep on purpose. A tower is permanent and can never be lost, so a flat
+     * price ends with a neighbourhood carpeted in guns and a game that plays
+     * itself. The curve keeps each one a decision about WHERE rather than an
+     * item on a list.
+     */
+    baseCost: 260,
+    costGrowth: 1.55,
+    /** Upgrading one in place: same curve, cheaper start. */
+    upgradeGrowth: 1.7,
+
+    /**
+     * How near you must be for it to wake up.
+     *
+     * This is the rule that stops towers replacing walking. Fortify one corner
+     * and sit in it and nothing happens at all -- a sleeping tower kills
+     * nothing, so there is nothing to farm. They let you HOLD ground you walked
+     * to, which is a different thing from not having to walk.
+     */
+    wakeWithinMetres: 90,
+    /** How far it shoots, and how hard, at level one. */
+    rangeMetres: 30,
+    damage: 11,
+    intervalSeconds: 0.75,
+    /** Each upgrade adds this share of the level-one numbers. */
+    damagePerLevel: 0.45,
+    rangePerLevel: 0.12,
+    fireRatePerLevel: 0.18,
+
+    /**
+     * Nests within this far of a tower spawn more slowly -- see
+     * `suppressionShare`. This is the "towers do everything" half: they defend
+     * a spot AND they push back the tide, so building one genuinely changes the
+     * neighbourhood rather than only the next thirty seconds.
+     */
+    suppressWithinMetres: 70,
+    /** How much of a nest's rate a fully suppressed one keeps. */
+    suppressionShare: 0.55,
+
+    /** No two towers closer than this, so they cannot be stacked on one spot. */
+    minimumSpacingMetres: 35,
+    /** How big it looks. */
+    radiusMetres: 3,
+  },
+
   performance: {
     /** What we are aiming for on a mid-range Android. */
     targetFps: 60,
