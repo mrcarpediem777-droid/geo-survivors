@@ -199,6 +199,7 @@ async function boot(): Promise<void> {
   // 8. DEV TOOLS -- see the long comment above -----------------------------
   if (DEV_TOOLS_ENABLED) {
     const { installDevTools } = await import('./ui/devPanel');
+    const { Harness } = await import('./dev/harness');
     installDevTools(uiContainer, mapView, location, profile, game);
 
     // Also hang the game's pieces off the browser's debug console, so problems
@@ -219,6 +220,10 @@ async function boot(): Promise<void> {
       // even when the ad fails -- can be re-tested at any time, rather than
       // being checked once and then quietly rotting.
       rewardedAd,
+      // The measuring instrument, in the repository rather than typed fresh
+      // into this console every time -- which is how it went wrong three
+      // separate ways in one afternoon. See dev/harness.ts.
+      harness: new Harness(game, profile, location),
     };
   }
 }
