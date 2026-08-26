@@ -30,43 +30,73 @@ const COLUMNS = 8;
  * know. To use real artwork later, replace this file's drawing step with an
  * image load and leave the rest of the renderer alone.
  */
-export const SPRITES = [
-  // THE FIRST FOUR MUST STAY IN THE SAME ORDER AS TUNING.monsters.types.
-  // Getting this wrong is silent -- the stalker simply wore the spider's face,
-  // because the disabled spitter still occupies a slot between them.
-  '🕷️', // 0  swarmer  -- the common crowd
-  '🐗', // 1  brute    -- slow and heavy
-  '🐍', // 2  spitter  -- currently switched off
-  '🦂', // 3  stalker  -- quick and nasty
-  '💠', // 4  experience
-  '🪙', // 5  coin
-  '🕳️', // 6  nest
-  '🔵', // 7  you
-  '✦', // 8  a shot
-  // Characters, in the order they appear in characters.ts.
-  '🌀', // 9  bladedancer
-  '🎯', // 10 sniper
-  '🛡️', // 11 bruiser
-  '🧲', // 12 collector
+/*
+ * THE PICTURES, and how a monster finds the right one.
+ *
+ * This list used to be joined to the monster list BY POSITION -- a monster's
+ * slot in the tuning file was its picture number -- with a warning here saying
+ * that getting it wrong is silent, because the disabled spitter still holds a
+ * slot and the stalker once wore the spider's face.
+ *
+ * That was a trap waiting for the next person to add a monster: a fifth type
+ * would have been drawn as the experience crystal, and nothing would have said
+ * so. The two lists are joined by NAME now, so they cannot drift apart.
+ */
+export const SPRITE_NAMES = [
+  'swarmer',
+  'brute',
+  'spitter',
+  'stalker',
+  'shell',
+  'splitter',
+  'skitterer',
+  'xp',
+  'coin',
+  'nest',
+  'you',
+  'shot',
+  'bladedancer',
+  'sniper',
+  'bruiser',
+  'collector',
 ] as const;
 
-export const SpriteIndex = {
-  SWARMER: 0,
-  BRUTE: 1,
-  SPITTER: 2,
-  STALKER: 3,
-  XP: 4,
-  COIN: 5,
-  NEST: 6,
-  PLAYER: 7,
-  PROJECTILE: 8,
-} as const;
+export const SPRITES = [
+  '🕷️', // swarmer   -- the common crowd
+  '🐗', // brute     -- slow and heavy
+  '🐍', // spitter   -- currently switched off
+  '🦂', // stalker   -- quick and nasty
+  '🐢', // shell     -- armoured, shrugs off small hits
+  '🪱', // splitter  -- dies into two
+  '🐜', // skitterer -- fast, fragile, arrives first
+  '💠', // xp
+  '🪙', // coin
+  '🕳️', // nest
+  '🔵', // you
+  '✦', // shot
+  '🌀', // bladedancer
+  '🎯', // sniper
+  '🛡️', // bruiser
+  '🧲', // collector
+] as const;
 
-/**
- * Monster variants index straight into the sprite list, so a new monster type
- * only needs its emoji adding at the right position above.
+/** Look a picture up by name. Returns 0 rather than throwing at draw time. */
+export function spriteIndexByName(name: string): number {
+  const index = SPRITE_NAMES.indexOf(name as (typeof SPRITE_NAMES)[number]);
+  return index < 0 ? 0 : index;
+}
+
+/*
+ * Names for the things that are not monsters, worked out from the list above so
+ * that inserting a monster can never shift them by one again.
  */
-export const MONSTER_SPRITE_COUNT = 4;
+export const SpriteIndex = {
+  XP: spriteIndexByName('xp'),
+  COIN: spriteIndexByName('coin'),
+  NEST: spriteIndexByName('nest'),
+  PLAYER: spriteIndexByName('you'),
+  PROJECTILE: spriteIndexByName('shot'),
+} as const;
 
 export interface AtlasInfo {
   canvas: HTMLCanvasElement;

@@ -18,6 +18,18 @@
  */
 export interface MonsterType {
   name: string;
+  /**
+   * WHICH PICTURE IT WEARS, by name, from `emojiAtlas.ts`.
+   *
+   * Named rather than positional. It used to be positional -- a monster's slot
+   * in this list WAS its sprite number -- and the file already carried a warning
+   * that getting it wrong is silent, because the disabled spitter still occupies
+   * a slot and the stalker once wore the spider's face. Adding a fifth monster
+   * would have given it the experience crystal's picture and nobody would have
+   * been told. Now the two lists cannot drift apart, because they are joined by
+   * a word instead of a coincidence.
+   */
+  sprite: string;
   /** REAL metres per second. Must stay under 1.4 -- see the note below. */
   speedMps: number;
   health: number;
@@ -27,6 +39,18 @@ export interface MonsterType {
   colour: [number, number, number, number];
   /** Relative chance of a nest producing this one. */
   weight: number;
+  /**
+   * Takes this much off EVERY hit, before anything else.
+   *
+   * Not a percentage: a flat subtraction is what makes it interesting. Weapons
+   * that land many small hits are blunted, weapons that land few big ones are
+   * not -- so the same crowd is easy for a lance and miserable for a
+   * scattergun, and which weapon you took stops being a matter of taste.
+   */
+  armour?: number;
+  /** On death, becomes this many of another kind. Named, as above. */
+  splitsInto?: string;
+  splitCount?: number;
   /** Shooters only: how far away they stop and open fire. */
   rangeMetres?: number;
   reloadSeconds?: number;
@@ -257,6 +281,7 @@ export const TUNING = {
     types: [
       {
         name: 'swarmer',
+        sprite: 'swarmer',
         /** Fast, weak, arrives in crowds. The bread and butter. */
         speedMps: 0.95,
         health: 26,
@@ -284,6 +309,7 @@ export const TUNING = {
       },
       {
         name: 'brute',
+        sprite: 'brute',
         /** Slow and tough. Blocks alleys and soaks damage. */
         speedMps: 0.6,
         health: 120,
@@ -295,6 +321,7 @@ export const TUNING = {
       },
       {
         name: 'spitter',
+        sprite: 'spitter',
         /**
          * Stops at a distance and shoots. Its shots are stopped by real
          * buildings, so ducking behind a house genuinely saves you -- this is
@@ -323,6 +350,7 @@ export const TUNING = {
       },
       {
         name: 'stalker',
+        sprite: 'stalker',
         /**
          * The spitter's replacement. Quick and fragile, and it hurts on contact
          * rather than at range -- so the pressure still varies, but nothing
@@ -336,10 +364,91 @@ export const TUNING = {
         colour: [230, 140, 50, 255],
         weight: 10,
       },
+
+      /* ---------------------------------------------------------------- */
+      /* THREE THAT BEHAVE DIFFERENTLY, not merely three more stat blocks. */
+      /*                                                                   */
+      /* Every monster in this game did exactly one thing -- walk at you   */
+      /* and touch you -- so every fight looked the same and it never      */
+      /* mattered which weapon you were holding. These each break one      */
+      /* assumption instead.                                               */
+      /*                                                                   */
+      /* NONE OF THEM SHOOTS. That decision is locked; the point here is   */
+      /* that variety does not require it.                                 */
+      /* ---------------------------------------------------------------- */
+      {
+        name: 'shell',
+        sprite: 'shell',
+        /**
+         * Armoured. Takes 7 off every single hit, however small.
+         *
+         * The one that makes your weapon choice matter. A lance landing 60 a
+         * time barely notices; a scattergun landing 8 a pellet is nearly
+         * useless against it. Slow enough to walk away from, as everything is.
+         */
+        speedMps: 0.55,
+        health: 90,
+        damagePerSecond: 11,
+        radiusMetres: 2.4,
+        armour: 6,
+        xp: 11,
+        colour: [120, 130, 150, 255],
+        weight: 12,
+      },
+      {
+        name: 'splitter',
+        sprite: 'splitter',
+        /**
+         * Dies into two swarmers.
+         *
+         * Turns "clear the crowd" into a decision: sweeping the whole street
+         * with an area weapon makes MORE crowd, so there is finally a reason to
+         * think about what you are killing rather than how much.
+         */
+        speedMps: 0.7,
+        health: 60,
+        damagePerSecond: 8,
+        radiusMetres: 2.2,
+        splitsInto: 'swarmer',
+        splitCount: 2,
+        xp: 6,
+        colour: [90, 190, 130, 255],
+        weight: 14,
+      },
+      {
+        name: 'skitterer',
+        sprite: 'skitterer',
+        /**
+         * Arrives first and dies to a stiff breeze.
+         *
+         * At the speed cap, so it is the thing that reaches you before you have
+         * decided what to do -- but with 14 health it dies to anything at all.
+         * It is a warning that the rest are coming, not a threat in itself.
+         */
+        speedMps: 1.05,
+        health: 14,
+        damagePerSecond: 5,
+        radiusMetres: 1.3,
+        xp: 4,
+        colour: [240, 200, 70, 255],
+        weight: 18,
+      },
     ] as MonsterType[],
 
     /** Monsters further than this from the player give up and vanish. */
     despawnBeyondMetres: 320,
+    /**
+     * The smallest share of a hit that armour may take away.
+     *
+     * Measured with no floor worth speaking of: an armoured shell needed NINETY
+     * ONE scattergun pellets and nine lance bolts. That is not "your weapon
+     * choice matters", it is "this monster is immune to half the arsenal", which
+     * is the same wall this project has already had to dismantle twice
+     * elsewhere. At 0.35 the same comparison is 39 against 8 -- about five times
+     * harder for the wrong weapon, where an ordinary brute is under three. Still
+     * clearly a decision, no longer a brick wall.
+     */
+    minimumShareThroughArmour: 0.35,
     /** How long a monster flashes white after being hit, in seconds. */
     /**
      * How long a monster flashes white after being hit, in seconds.

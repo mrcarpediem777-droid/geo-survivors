@@ -32,7 +32,17 @@ import {
   type Map as MapLibreMap,
 } from 'maplibre-gl';
 import { EntityKind, type EntityStore } from '../world/entities';
-import { buildEmojiAtlas, SpriteIndex, MONSTER_SPRITE_COUNT, type AtlasInfo } from './emojiAtlas';
+import { buildEmojiAtlas, SpriteIndex, spriteIndexByName, type AtlasInfo } from './emojiAtlas';
+import { TUNING } from '../config/tuning';
+
+/**
+ * Which picture each monster type wears, worked out once from its NAME.
+ *
+ * This used to be the monster's position in the tuning list, which meant adding
+ * a fifth monster would silently have drawn it as the experience crystal. Built
+ * from names instead, so the two lists cannot drift apart.
+ */
+const MONSTER_SPRITE = TUNING.monsters.types.map((type) => spriteIndexByName(type.sprite));
 
 /** Which picture each sort of thing uses. Monsters choose by their variant. */
 const SPRITE_FOR_KIND: Record<number, number> = {
@@ -428,10 +438,10 @@ export class EntityLayer implements CustomLayerInterface {
       const kind = store.kind[id];
       data[offset + 4] =
         kind === EntityKind.MONSTER
-          ? Math.min(store.variant[id], MONSTER_SPRITE_COUNT - 1)
+          ? (MONSTER_SPRITE[store.variant[id]] ?? 0)
           : kind === EntityKind.PLAYER
             ? this.playerSprite
-            : (SPRITE_FOR_KIND[kind] ?? SpriteIndex.SWARMER);
+            : (SPRITE_FOR_KIND[kind] ?? 0);
       data[offset + 5] = Math.min(1, store.hitFlash[id] * 8);
 
       written++;

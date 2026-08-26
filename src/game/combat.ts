@@ -1400,7 +1400,20 @@ export class Combat {
 
   private hurtMonster(id: EntityId, damage: number): void {
     const store = this.entities;
-    store.health[id] -= damage;
+
+    // Armour comes off every hit, flat. That is what makes it interesting: a
+    // weapon landing few big hits barely notices, one landing many small hits is
+    // nearly useless -- so which weapon you took finally decides something. A
+    // hit is never reduced to nothing, or an armoured monster would simply be
+    // immortal against half the arsenal.
+    const type = TUNING.monsters.types[store.variant[id]];
+    const armour = type?.armour ?? 0;
+    const dealt =
+      armour > 0
+        ? Math.max(damage * TUNING.monsters.minimumShareThroughArmour, damage - armour)
+        : damage;
+
+    store.health[id] -= dealt;
     store.hitFlash[id] = TUNING.monsters.hitFlashSeconds;
     if (store.health[id] <= 0) {
       this.killMonster(id, true);
@@ -1437,6 +1450,28 @@ export class Combat {
         if (coin >= 0) {
           this.entities.value[coin] = TUNING.player.coinValue;
           this.entities.lifetime[coin] = TUNING.player.lootLifetimeSeconds;
+        }
+      }
+    }
+
+    // Some things become two things.
+    //
+    // Done before the slot is released so the position is still readable, and
+    // only when killed by the player -- a splitter cleared by a neighbourhood
+    // going quiet should not leave two children standing in an empty street.
+    const type = TUNING.monsters.types[store.variant[id]];
+    if (dropXp && type?.splitsInto) {
+      const childVariant = TUNING.monsters.types.findIndex((t) => t.name === type.splitsInto);
+      if (childVariant >= 0) {
+        const x = this.collision.toLocalX(store.lng[id]);
+        const y = this.collision.toLocalY(store.lat[id]);
+        for (let n = 0; n < (type.splitCount ?? 2); n++) {
+          if (this.livingMonsters >= this.monsterCeiling()) break;
+          const angle = (n / (type.splitCount ?? 2)) * Math.PI * 2;
+          const childX = x + Math.cos(angle) * 2.2;
+          const childY = y + Math.sin(angle) * 2.2;
+          if (!this.collision.hasClearance(childX, childY, 1.2)) continue;
+          this.spawnMonsterAt(childVariant, childX, childY);
         }
       }
     }

@@ -10,7 +10,7 @@ Claude: *"Read PLAYBOOK.md and tell me where we left off."*
 | | |
 |---|---|
 | **Milestone reached** | **M5 — clearing nests and permanent progress** ✅ |
-| **Next milestone** | M9 — the map's meaning: bridges, and streets that differ by kind |
+| **Next milestone** | M10 — monsters that behave differently, not just harder |
 | **Code lives at** | https://github.com/mrcarpediem777-droid/geo-survivors |
 | **Live URL** | **https://geo-survivors.vercel.app** |
 | **Vercel dashboard** | https://vercel.com/abc-70f4/geo-survivors |
@@ -1086,6 +1086,48 @@ Still unopened: `street_polygons` (pedestrian squares), `bridges`, `pois`,
 `sites`.
 
 ---
+
+## Monsters that behave differently (M10)
+
+Every monster did exactly one thing: walk at you and touch you. So every fight
+looked the same, and it never mattered which weapon you were holding. Three new
+kinds, each breaking one assumption rather than being another stat block. **None
+of them shoots** -- that decision is locked, and the point is that variety does
+not require it.
+
+| | what it does | why it changes a decision |
+|---|---|---|
+| 🐢 **Shell** | takes 6 off every hit, flat | few big hits barely notice; many small hits are blunted, so weapon choice finally decides something |
+| 🪱 **Splitter** | dies into two swarmers | sweeping the street with an area weapon makes *more* street, so what you kill starts to matter as much as how much |
+| 🐜 **Skitterer** | fastest allowed, 14 health | arrives before you have decided anything, and dies to a breeze -- a warning, not a threat |
+
+### Armour was a brick wall on the first attempt
+
+Measured: an armoured shell needed **91 scattergun pellets and 9 lance bolts**.
+That is not "your weapon choice matters", it is "immune to half the arsenal" --
+the same wall this project has already had to dismantle twice elsewhere. With a
+floor on what a hit may be reduced to (`monsters.minimumShareThroughArmour`), the
+same comparison is **39 against 8**: about five times harder for the wrong
+weapon, where an ordinary brute is under three. A decision, not a wall.
+
+### A trap the code had been warning about for months
+
+A monster's picture was its **position** in the tuning list, with a comment here
+saying that getting it wrong is silent, because the disabled spitter still holds
+a slot and the stalker once wore the spider's face. Adding a fifth monster would
+have drawn it as the experience crystal and nothing would have said so. The two
+lists are joined **by name** now (`spriteIndexByName`), so they cannot drift.
+
+### What it cost
+
+Standing still with nothing bought: **79 s, was about 90** -- the new kinds are
+heavier than a swarmer and make up roughly a third of spawns. The health slope is
+unchanged in shape. The core loop still works: a brand-new player clears their
+first nest at **85 s** (was 70) and reaches level 11, because the new monsters are
+worth more. Peak 120 monsters, median frame 0.80 ms, 99th 5.4 ms.
+
+---
+
 
 ## Known issues and honest limitations
 
