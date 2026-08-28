@@ -85,9 +85,22 @@ export const config = { runtime: 'edge' };
 
 export default async function handler(request: Request): Promise<Response> {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
-    // The ordinary state before anybody sets up a database. Not an error: the
-    // game is told plainly and keeps everything on the phone.
-    return json({ configured: false }, 200);
+    /*
+     * The ordinary state before anybody sets up a database. Not an error: the
+     * game is told plainly and keeps everything on the phone.
+     *
+     * It also says WHICH setting is missing, because "not configured" on its own
+     * is useless to somebody who has just spent ten minutes configuring it --
+     * the difference between a typo in a name, a value that did not save, and a
+     * deployment that predates both is otherwise invisible.
+     *
+     * Only NAMES are ever reported, never values. The names are in the public
+     * repository already; the values are the entire secret.
+     */
+    const missing: string[] = [];
+    if (!SUPABASE_URL) missing.push('SUPABASE_URL');
+    if (!SUPABASE_SERVICE_KEY) missing.push('SUPABASE_SERVICE_KEY');
+    return json({ configured: false, missing }, 200);
   }
 
   const url = new URL(request.url);
